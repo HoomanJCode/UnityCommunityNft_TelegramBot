@@ -17,7 +17,7 @@ import asyncio
 import logging
 import os
 
-from pytoniq import Address, LiteBalancer, WalletV4R2, begin_cell
+from pytoniq import Address, LiteBalancer, StateInit, WalletV4R2, begin_cell
 from pytoniq_core import Cell
 
 from backend.worker import MintWorker
@@ -144,6 +144,71 @@ class PytoniqTONClient:
             .end_cell()
         )
 
+    async def _ensure_wallet_activated(self, wallet) -> None:
+        """Deploy the wallet if it has never been activated, waiting for seqno."""
+        if not wallet.is_uninitialized:
+            return
+        await wallet.send_init_external()
+        seqno = 0
+        for _ in range(self._init_poll_attempts):
+            await asyncio.sleep(self._init_poll_interval)
+            seqno = await wallet.get_seqno()
+            if seqno > 0:
+                break
+        if seqno == 0:
+            # Never return a hash for a transfer that cannot land.
+            raise RuntimeError("wallet activation not confirmed (seqno still 0)")
+
+    async def _send_via_wallet(self, wallet, message) -> str:
+        """Sign + submit one wallet message; return the tx (message) hash.
+
+        The hash is computed from the signed transfer cell before submission —
+        `raw_send_message` itself only returns a network status.
+        """
+        seqno = await wallet.get_seqno()
+        transfer_cell = wallet.raw_create_transfer_msg(
+            wallet.private_key, seqno, wallet.wallet_id, [message]
+        )
+        tx_hash = transfer_cell.hash.hex()
+        status = await wallet.send_external(body=transfer_cell)
+        if status not in (None, 1):
+            raise RuntimeError(f"send_external failed with status {status!r}")
+        return tx_hash
+
+    async def deploy_contract(
+        self,
+        code: Cell,
+        data: Cell,
+        amount_nanoton: int = int(0.05 * 10**9),
+    ) -> tuple[str, str]:
+        """Deploy a contract from its code + data cells.
+
+        Returns (contract_address, tx_hash). The deployer wallet is used to
+        send an internal message carrying the StateInit, which activates the
+        contract on first receipt.
+        """
+        async with self._lock:
+            await self.connect()
+            wallet = self._wallet
+            await self._ensure_wallet_activated(wallet)
+
+            state_init = StateInit(code=code, data=data)
+            address = Address((0, state_init.serialize().hash))
+
+            message = wallet.create_wallet_internal_message(
+                destination=address,
+                value=amount_nanoton,
+                state_init=state_init,
+            )
+            tx_hash = await self._send_via_wallet(wallet, message)
+
+            logger.info(
+                "contract deploy submitted: address=%s hash=%s",
+                address.to_str(is_bounceable=False),
+                tx_hash,
+            )
+            return address.to_str(is_bounceable=False), tx_hash
+
     async def mint_nft(
         self,
         collection_address: str,
@@ -158,21 +223,7 @@ class PytoniqTONClient:
         async with self._lock:
             await self.connect()
             wallet = self._wallet
-
-            # An undeployed wallet must be activated before it can send.
-            if wallet.is_uninitialized:
-                await wallet.send_init_external()
-                seqno = 0
-                for _ in range(self._init_poll_attempts):
-                    await asyncio.sleep(self._init_poll_interval)
-                    seqno = await wallet.get_seqno()
-                    if seqno > 0:
-                        break
-                if seqno == 0:
-                    # Never return a hash for a transfer that cannot land.
-                    raise RuntimeError(
-                        "wallet activation not confirmed (seqno still 0)"
-                    )
+            await self._ensure_wallet_activated(wallet)
 
             item_index = await self.next_item_index(collection_address)
             uri = item_uri or self._metadata_uri or ""
@@ -183,14 +234,7 @@ class PytoniqTONClient:
                 value=MINT_VALUE_NANOTON,
                 body=body,
             )
-            seqno = await wallet.get_seqno()
-            transfer_cell = wallet.raw_create_transfer_msg(
-                wallet.private_key, seqno, wallet.wallet_id, [message]
-            )
-            tx_hash = transfer_cell.hash.hex()
-            status = await wallet.send_external(body=transfer_cell)
-            if status not in (None, 1):
-                raise RuntimeError(f"send_external failed with status {status!r}")
+            tx_hash = await self._send_via_wallet(wallet, message)
 
             logger.info(
                 "mint submitted: collection=%s index=%s hash=%s",
@@ -224,7 +268,20 @@ async def run_worker(poll_interval: float = 5.0) -> None:
 
         from backend.services.notify import TelegramNotifier
 
-        notifier = TelegramNotifier(Bot(token=token))
+        # Optional operator chat that receives 🚨 mint-failure alerts.
+        admin_chat_raw = os.getenv("ADMIN_CHAT_ID")
+        try:
+            admin_chat_id = int(admin_chat_raw) if admin_chat_raw else None
+        except ValueError:
+            # A malformed ADMIN_CHAT_ID must not crash the worker at boot.
+            logger.warning(
+                "ignoring invalid ADMIN_CHAT_ID %r (must be an integer)",
+                admin_chat_raw,
+            )
+            admin_chat_id = None
+        notifier = TelegramNotifier(
+            Bot(token=token), admin_chat_id=admin_chat_id
+        )
 
     worker = MintWorker(client, notifier=notifier)
     try:

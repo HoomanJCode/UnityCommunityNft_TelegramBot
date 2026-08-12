@@ -59,8 +59,17 @@ class FakeWallet:
     async def get_seqno(self):
         return self.seqno_value
 
-    def create_wallet_internal_message(self, destination, value, body, **kwargs):
-        return {"destination": destination, "value": value, "body": body}
+    def create_wallet_internal_message(
+        self, destination, value, body=None, **kwargs
+    ):
+        # `body` defaults to None here (pytoniq uses Cell.empty()); deploys
+        # pass state_init through kwargs instead.
+        return {
+            "destination": destination,
+            "value": value,
+            "body": body,
+            "state_init": kwargs.get("state_init"),
+        }
 
     def raw_create_transfer_msg(self, private_key, seqno, wallet_id, messages):
         self.last_messages = messages
@@ -188,6 +197,36 @@ def test_wallet_address_before_and_after_connect():
 
     asyncio.run(client.connect())
     assert client.wallet_address == wallet.address.to_str(is_bounceable=False)
+
+
+def test_deploy_contract_returns_address_and_hash():
+    from pytoniq import StateInit
+
+    provider = FakeProvider()
+    wallet = FakeWallet()
+    client = _client(provider=provider, wallet=wallet)
+    code = begin_cell().store_uint(1, 8).end_cell()
+    data = (
+        begin_cell()
+        .store_uint(0, 1)  # Tact init flag
+        .store_address(Address("0:" + "33" * 32))
+        .store_ref(begin_cell().store_uint(0x01, 8).end_cell())
+        .end_cell()
+    )
+
+    address, tx_hash = asyncio.run(
+        client.deploy_contract(code, data, amount_nanoton=50_000_000)
+    )
+
+    # Address is derived from the code+data state init; hash from the sent cell.
+    expected = Address((0, StateInit(code=code, data=data).serialize().hash))
+    assert address == expected.to_str(is_bounceable=False)
+    assert len(tx_hash) == 64
+    assert tx_hash == wallet.sent[0].hash.hex()
+
+    message = wallet.last_messages[0]
+    assert message["value"] == 50_000_000
+    assert message["state_init"] is not None
 
 
 def test_close_closes_provider():
