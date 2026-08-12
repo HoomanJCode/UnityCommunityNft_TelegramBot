@@ -10,6 +10,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Protocol
 
+from sqlalchemy import update
+
 from backend.db.models import Assignment, BadgeType, User
 from backend.db.session import SessionLocal
 from backend.services.assignment import (
@@ -40,6 +42,7 @@ class MintWorker:
 
     async def process_one(self, assignment_id: int) -> str:
         """Process a single assignment; returns its final status."""
+        # Step 1: read the assignment and validate prerequisites.
         with SessionLocal() as db:
             assignment = db.get(Assignment, assignment_id)
             if assignment is None:
@@ -58,22 +61,35 @@ class MintWorker:
 
             # Missing wallet → can't mint
             if user is None or not user.wallet_address:
-                assignment.status = STATUS_NEEDS_WALLET
+                transition_assignment(assignment, STATUS_NEEDS_WALLET)
                 db.commit()
                 return STATUS_NEEDS_WALLET
 
             if badge_type is None or not badge_type.collection_address:
                 assignment.error = "badge type not deployed (no collection_address)"
-                assignment.status = STATUS_FAILED
+                transition_assignment(assignment, STATUS_FAILED)
                 db.commit()
                 return STATUS_FAILED
 
-            transition_assignment(assignment, STATUS_MINTING)
-            db.commit()
             wallet = user.wallet_address
             collection = badge_type.collection_address
 
-        # Mint outside the DB session (network I/O)
+        # Step 2: atomically claim the assignment (queued -> minting).
+        # A conditional UPDATE ensures only one worker can claim it.
+        with SessionLocal() as db:
+            result = db.execute(
+                update(Assignment)
+                .where(
+                    Assignment.id == assignment_id,
+                    Assignment.status == STATUS_QUEUED,
+                )
+                .values(status=STATUS_MINTING)
+            )
+            db.commit()
+            if result.rowcount == 0:
+                return "already_claimed"
+
+        # Step 3: mint outside the DB session (network I/O).
         try:
             tx_hash = await self.ton_client.mint_nft(collection, wallet)
         except Exception as e:  # noqa: BLE001 - record any mint failure
@@ -85,6 +101,7 @@ class MintWorker:
             logger.exception("mint failed for assignment %s", assignment_id)
             return STATUS_FAILED
 
+        # Step 4: mark as minted.
         with SessionLocal() as db:
             assignment = db.get(Assignment, assignment_id)
             assignment.tx_hash = tx_hash

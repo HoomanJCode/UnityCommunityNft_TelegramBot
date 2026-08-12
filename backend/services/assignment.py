@@ -23,13 +23,15 @@ VALID_STATUSES = {
     STATUS_NEEDS_WALLET,
 }
 
-# Allowed transitions (target -> allowed next states)
+# Allowed transitions (current -> allowed next states).
+# A missing key means the state is terminal (no outgoing transitions).
 TRANSITIONS = {
     STATUS_PENDING: {STATUS_QUEUED, STATUS_FAILED},
-    STATUS_QUEUED: {STATUS_MINTING, STATUS_FAILED},
+    STATUS_QUEUED: {STATUS_MINTING, STATUS_FAILED, STATUS_NEEDS_WALLET},
     STATUS_MINTING: {STATUS_MINTED, STATUS_FAILED},
     STATUS_FAILED: {STATUS_QUEUED, STATUS_PENDING},
     STATUS_NEEDS_WALLET: {STATUS_PENDING},
+    STATUS_MINTED: set(),
 }
 
 
@@ -49,8 +51,8 @@ def transition_assignment(
     if new_status not in VALID_STATUSES:
         raise ValueError(f"unknown status: {new_status}")
 
-    allowed = TRANSITIONS.get(assignment.status)
-    if allowed and new_status not in allowed:
+    allowed = TRANSITIONS.get(assignment.status, set())
+    if new_status not in allowed:
         raise ValueError(
             f"invalid transition: {assignment.status} -> {new_status}"
         )
