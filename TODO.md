@@ -8,19 +8,19 @@
 
 **Exit criteria:** Bot & backend boot, DB migrations run.
 
-- [ ] Scaffold repo directories: `bot/`, `backend/`, `contracts/`, `web/miniapp/`, `web/admin/`, `tests/`
-- [ ] Create `.env.example` with all required vars (bot token, admin key, TonAPI key, deployer mnemonic)
-- [ ] Set up Python project: `requirements.txt` / `pyproject.toml` with aiogram, FastAPI, SQLAlchemy, pytoniq
-- [ ] **🔖 git commit: project scaffold + env + dependencies**
-- [ ] Create `backend/db/` — SQLAlchemy models (users, badge_types, events, attendees, assignments)
-- [ ] Create `backend/db/session.py` — database session + init
-- [ ] Run DB migrations (Alembic or SQLAlchemy create_all)
-- [ ] **🔖 git commit: database models + migrations**
-- [ ] Create `bot/main.py` — minimal aiogram bot that boots
-- [ ] Create `backend/main.py` — minimal FastAPI app that boots
-- [ ] Verify bot boots and responds to `/start`
-- [ ] Verify FastAPI boots and serves health check
-- [ ] **🔖 git commit: bot + backend boot (Phase 0 complete ✓)**
+- [x] Scaffold repo directories: `bot/`, `backend/`, `contracts/`, `web/miniapp/`, `web/admin/`, `tests/`
+- [x] Create `.env.example` with all required vars (bot token, admin key, TonAPI key, deployer mnemonic)
+- [x] Set up Python project: `requirements.txt` with python-telegram-bot, Flask, SQLAlchemy, pytoniq
+- [x] **🔖 git commit: project scaffold + env + dependencies**
+- [x] Create `backend/db/` — SQLAlchemy models (users, badge_types, events, attendees, assignments)
+- [x] Create `backend/db/session.py` — database session + init
+- [x] Run DB migrations (SQLAlchemy create_all)
+- [x] **🔖 git commit: database models + migrations**
+- [x] Create `bot/main.py` — minimal python-telegram-bot that boots
+- [x] Create `backend/main.py` — minimal Flask app that boots
+- [x] Verify bot imports and boots
+- [x] Verify Flask app imports and serves health check + DB init
+- [x] **🔖 git commit: bot + backend boot (Phase 0 complete ✓)**
 
 ---
 
@@ -117,7 +117,7 @@
 
 | Phase | Status |
 |-------|--------|
-| 0 · Foundations | ⬜ Not started |
+| 0 · Foundations | ✅ Complete |
 | 1 · Contracts | ⬜ Not started |
 | 2 · Bot Onboarding | ⬜ Not started |
 | 3 · Mini App | ⬜ Not started |

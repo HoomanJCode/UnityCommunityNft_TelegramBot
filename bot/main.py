@@ -14,8 +14,8 @@ from telegram import (
 )
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
-from backend.db.models import User
 from backend.db.session import SessionLocal
+from backend.services.user import upsert_user
 
 load_dotenv()
 
@@ -54,17 +54,12 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     phone = contact.phone_number.lstrip("+")
 
     with SessionLocal() as db:
-        user = db.query(User).filter(User.telegram_id == tg_user.id).first()
-        if user:
-            user.phone = phone
-            user.username = tg_user.username
-        else:
-            user = User(
-                telegram_id=tg_user.id,
-                username=tg_user.username,
-                phone=phone,
-            )
-            db.add(user)
+        upsert_user(
+            db,
+            telegram_id=tg_user.id,
+            username=tg_user.username,
+            phone=phone,
+        )
         db.commit()
 
         wallet_kb = InlineKeyboardMarkup(
