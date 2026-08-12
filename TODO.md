@@ -28,12 +28,12 @@
 
 **Exit criteria:** Both contracts deploy on **testnet**, mint verified in explorer.
 
-- [ ] Set up Tact project structure in `contracts/`
-- [ ] Write transferable badge collection contract (TEP-62 NFT)
-- [ ] Write soulbound badge collection contract (TEP-85 SBT)
-- [ ] Write unit tests for both contracts (Tact test framework)
-- [ ] Compile contracts to `contracts/build/`
-- [ ] **🔖 git commit: smart contracts + tests**
+- [x] Set up Tact project structure in `contracts/` (npm + tact.config.json)
+- [x] Write transferable badge collection contract (TEP-62 NFT)
+- [x] Write soulbound badge collection contract (TEP-85 SBT)
+- [x] Write unit tests for both contracts (Tact test framework — 10 sandbox tests)
+- [x] Compile contracts to `contracts/build/`
+- [x] **🔖 git commit: smart contracts + tests**
 - [ ] Create Python deploy scripts in `contracts/deploy/` (testnet)
 - [ ] Deploy transferable collection to TON testnet
 - [ ] Deploy soulbound collection to TON testnet
@@ -83,7 +83,6 @@
 - [x] Implement CSV upload / paste phone numbers for batch (backend API)
 - [x] Create `backend/api/admin.py` — badge/event CRUD endpoints
 - [x] **🔖 git commit: admin CRUD APIs**
-- [x] Build `backend/services/ton.py` — placeholder (pytoniq client pending Rust)
 - [x] Build `backend/services/ton.py` — real pytoniq mint client (`PytoniqTONClient`; mint logic runs in worker.py)
 - [x] Build `backend/worker.py` — background mint queue (asyncio task, pluggable TON client)
 - [x] Implement assignment status tracking (pending → queued → minting → minted | failed | needs_wallet)
@@ -119,7 +118,7 @@
 | Phase | Status |
 |-------|--------|
 | 0 · Foundations | ✅ Complete |
-| 1 · Contracts | ⬜ Not started |
+| 1 · Contracts | 🟡 Compiled + tested; testnet deploy pending |
 | 2 · Bot Onboarding | 🟡 Pending live e2e test |
 | 3 · Mini App | 🟡 Backend done; frontend pending |
 | 4 · Admin + Batch Mint | 🟡 Backend done; frontend + live mint pending |
