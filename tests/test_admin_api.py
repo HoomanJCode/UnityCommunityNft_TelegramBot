@@ -60,6 +60,8 @@ def test_create_badge_requires_name(client):
 
 
 def test_event_crud(client):
+    badge_id = _create_badge(client).get_json()["id"]
+
     r = client.post("/admin/events", json={"name": "Meetup"})
     assert r.status_code == 201
     e_id = r.get_json()["id"]
@@ -67,10 +69,15 @@ def test_event_crud(client):
     r = client.get("/admin/events")
     assert len(r.get_json()) == 1
 
-    r = client.put(f"/admin/events/{e_id}", json={"badge_type_id": 7})
-    assert r.get_json()["badge_type_id"] == 7
+    r = client.put(f"/admin/events/{e_id}", json={"badge_type_id": badge_id})
+    assert r.get_json()["badge_type_id"] == badge_id
 
     assert client.delete(f"/admin/events/{e_id}").status_code == 200
+
+
+def test_event_rejects_unknown_badge_type(client):
+    r = client.post("/admin/events", json={"name": "X", "badge_type_id": 999})
+    assert r.status_code == 404
 
 
 def test_create_assignments_json(client, monkeypatch):
