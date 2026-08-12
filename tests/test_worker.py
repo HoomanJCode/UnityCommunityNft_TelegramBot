@@ -24,7 +24,9 @@ class FakeTONClient:
         self.fail = fail
         self.calls = []
 
-    async def mint_nft(self, collection_address: str, recipient_wallet: str) -> str:
+    async def mint_nft(
+        self, collection_address: str, recipient_wallet: str, item_uri: str | None = None
+    ) -> str:
         self.calls.append((collection_address, recipient_wallet))
         if self.fail:
             raise RuntimeError("mint boom")

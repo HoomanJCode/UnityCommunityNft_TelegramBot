@@ -32,7 +32,12 @@ MAX_RETRIES = 3
 class TONClient(Protocol):
     """Minimal interface for minting an NFT on TON."""
 
-    async def mint_nft(self, collection_address: str, recipient_wallet: str) -> str:
+    async def mint_nft(
+        self,
+        collection_address: str,
+        recipient_wallet: str,
+        item_uri: str | None = None,
+    ) -> str:
         """Mint one NFT to the recipient wallet; return the tx hash."""
         ...
 
@@ -91,6 +96,7 @@ class MintWorker:
             collection = badge_type.collection_address
             telegram_id = user.telegram_id
             badge_name = badge_type.name
+            badge_uri = badge_type.metadata_uri
 
         # Step 2: atomically claim the assignment (queued -> minting).
         # A conditional UPDATE ensures only one worker can claim it.
@@ -109,7 +115,9 @@ class MintWorker:
 
         # Step 3: mint outside the DB session (network I/O).
         try:
-            tx_hash = await self.ton_client.mint_nft(collection, wallet)
+            tx_hash = await self.ton_client.mint_nft(
+                collection, wallet, badge_uri
+            )
         except Exception as e:  # noqa: BLE001 - record any mint failure
             with SessionLocal() as db:
                 assignment = db.get(Assignment, assignment_id)
@@ -156,6 +164,9 @@ class MintWorker:
         logger.info("mint worker started")
         while True:
             try:
+                # Grab up to 10 queued jobs per tick; the atomic claim inside
+                # process_one guarantees a job is never double-processed even
+                # if several worker processes run at once.
                 with SessionLocal() as db:
                     queued = (
                         db.query(Assignment)
@@ -168,7 +179,7 @@ class MintWorker:
 
                 for aid in ids:
                     await self.process_one(aid)
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001 - a bad job must not kill the loop
                 logger.exception("worker iteration failed")
 
             await asyncio.sleep(poll_interval)
