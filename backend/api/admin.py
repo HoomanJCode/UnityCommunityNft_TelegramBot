@@ -23,6 +23,15 @@ def _parse_datetime(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value)
 
 
+def _parse_bool(value) -> bool:
+    """Coerce a JSON bool or string 'true'/'false' to a Python bool."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return bool(value)
+
+
 def _badge_type_to_dict(bt: BadgeType) -> dict:
     return {
         "id": bt.id,
@@ -57,7 +66,7 @@ def create_badge_type():
         description=data.get("description"),
         image_url=data.get("image_url"),
         metadata_uri=data.get("metadata_uri"),
-        is_soulbound=bool(data.get("is_soulbound", False)),
+        is_soulbound=_parse_bool(data.get("is_soulbound", False)),
     )
     with SessionLocal() as db:
         db.add(bt)
@@ -87,7 +96,7 @@ def update_badge_type(badge_type_id: int):
             if field in data:
                 setattr(bt, field, data[field])
         if "is_soulbound" in data:
-            bt.is_soulbound = bool(data["is_soulbound"])
+            bt.is_soulbound = _parse_bool(data["is_soulbound"])
         if "collection_address" in data:
             bt.collection_address = data["collection_address"]
 
@@ -138,6 +147,8 @@ def create_event():
         badge_type_id=data.get("badge_type_id"),
     )
     with SessionLocal() as db:
+        if ev.badge_type_id and not db.get(BadgeType, ev.badge_type_id):
+            return jsonify({"error": "badge_type not found"}), 404
         db.add(ev)
         db.commit()
         db.refresh(ev)
@@ -168,7 +179,10 @@ def update_event(event_id: int):
         if "starts_at" in data:
             ev.starts_at = _parse_datetime(data["starts_at"])
         if "badge_type_id" in data:
-            ev.badge_type_id = data["badge_type_id"]
+            new_bt_id = data["badge_type_id"]
+            if new_bt_id and not db.get(BadgeType, new_bt_id):
+                return jsonify({"error": "badge_type not found"}), 404
+            ev.badge_type_id = new_bt_id
 
         db.commit()
         db.refresh(ev)
@@ -202,6 +216,8 @@ def create_assignments():
         return jsonify({"error": "phones must be a non-empty list"}), 400
 
     with SessionLocal() as db:
+        if not db.get(BadgeType, badge_type_id):
+            return jsonify({"error": "badge_type not found"}), 404
         summary = create_assignments_for_phones(db, badge_type_id, phones)
     return jsonify(summary), 201
 
@@ -225,6 +241,8 @@ def upload_assignments_csv():
     phones = [row[0] for row in csv.reader(io.StringIO(text)) if row]
 
     with SessionLocal() as db:
+        if not db.get(BadgeType, badge_type_id):
+            return jsonify({"error": "badge_type not found"}), 404
         summary = create_assignments_for_phones(db, badge_type_id, phones)
     return jsonify(summary), 201
 
