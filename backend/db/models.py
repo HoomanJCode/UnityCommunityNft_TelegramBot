@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -25,12 +26,12 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    telegram_id = Column(Integer, unique=True, nullable=False, index=True)
+    telegram_id = Column(BigInteger, unique=True, nullable=False, index=True)
     username = Column(String(255), nullable=True)
     phone = Column(String(20), nullable=True, index=True)
     wallet_address = Column(String(128), nullable=True)
-    wallet_connected_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=utcnow, nullable=False)
+    wallet_connected_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     attendees = relationship("Attendee", back_populates="user")
     assignments = relationship("Assignment", back_populates="user")
@@ -50,8 +51,8 @@ class BadgeType(Base):
     is_soulbound = Column(Boolean, default=False, nullable=False)
     collection_address = Column(String(128), nullable=True)
     supply = Column(Integer, default=0, nullable=False)
-    deployed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=utcnow, nullable=False)
+    deployed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     events = relationship("Event", back_populates="badge_type")
     assignments = relationship("Assignment", back_populates="badge_type")
@@ -66,7 +67,7 @@ class Event(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    starts_at = Column(DateTime, nullable=True)
+    starts_at = Column(DateTime(timezone=True), nullable=True)
     badge_type_id = Column(Integer, ForeignKey("badge_types.id"), nullable=True)
 
     badge_type = relationship("BadgeType", back_populates="events")
@@ -82,7 +83,7 @@ class Attendee(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    joined_at = Column(DateTime, default=utcnow, nullable=False)
+    joined_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     event = relationship("Event", back_populates="attendees")
     user = relationship("User", back_populates="attendees")
@@ -106,8 +107,8 @@ class Assignment(Base):
     # status: pending → queued → minting → minted | failed | needs_wallet
     tx_hash = Column(String(128), nullable=True)
     error = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=utcnow, nullable=False)
-    minted_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    minted_at = Column(DateTime(timezone=True), nullable=True)
 
     badge_type = relationship("BadgeType", back_populates="assignments")
     user = relationship("User", back_populates="assignments")

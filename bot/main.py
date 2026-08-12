@@ -38,7 +38,7 @@ def _phone_keyboard() -> ReplyKeyboardMarkup:
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start — welcome the user and request their phone number."""
     user = update.effective_user
-    await update.message.reply_text(
+    await update.effective_message.reply_text(
         f"👋 Hello, {user.first_name}!\n\n"
         "Welcome to the UnityCommunity NFT Bot.\n"
         "I can help you receive NFT badges for events you attend.\n\n"
@@ -49,7 +49,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle shared contact — create or update the user record."""
-    contact = update.message.contact
+    message = update.effective_message
+    contact = message.contact
     tg_user = update.effective_user
     phone = contact.phone_number.lstrip("+")
 
@@ -62,18 +63,18 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         db.commit()
 
-        wallet_kb = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🔗 Connect TON Wallet", url=MINI_APP_URL)]]
-        )
-        await update.message.reply_text(
-            f"✅ Phone number {contact.phone_number} saved!\n\n"
-            "Next step: connect your TON wallet to receive NFT badges.",
-            reply_markup=ReplyKeyboardRemove(),
-        )
-        await update.message.reply_text(
-            "🔗 Tap below to open the Mini App and connect your Telegram Wallet:",
-            reply_markup=wallet_kb,
-        )
+    wallet_kb = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("🔗 Connect TON Wallet", url=MINI_APP_URL)]]
+    )
+    await message.reply_text(
+        f"✅ Phone number {contact.phone_number} saved!\n\n"
+        "Next step: connect your TON wallet to receive NFT badges.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await message.reply_text(
+        "🔗 Tap below to open the Mini App and connect your Telegram Wallet:",
+        reply_markup=wallet_kb,
+    )
 
 
 def main() -> None:
