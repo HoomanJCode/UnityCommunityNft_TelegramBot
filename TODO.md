@@ -63,11 +63,11 @@
 - [ ] Scaffold Mini App: Vite + React + `@tonconnect/ui-react`
 - [ ] Implement TON Connect — wallet connection UI
 - [ ] **🔖 git commit: mini app scaffold + TON Connect UI**
-- [ ] Implement `initData` verification on backend (HMAC with bot token)
-- [ ] Create `backend/api/mini_app.py` — wallet link endpoint, badge gallery endpoint
-- [ ] Persist wallet address + connected_at in users table
+- [x] Implement `initData` verification on backend (HMAC with bot token)
+- [x] Create `backend/api/mini_app.py` — wallet link endpoint, badge gallery endpoint
+- [x] Persist wallet address + connected_at in users table
 - [ ] Build badge gallery UI (owned badges from contract)
-- [ ] **🔖 git commit: mini app wallet link + gallery backend**
+- [x] **🔖 git commit: mini app wallet link + gallery backend**
 - [ ] End-to-end test: open Mini App → connect wallet → address stored → gallery loads
 - [ ] **🔖 git commit: mini app end-to-end verified (Phase 3 complete ✓)**
 
@@ -99,8 +99,9 @@
 
 **Exit criteria:** Runbook for going live.
 
-- [ ] Implement mint retry logic (exponential backoff, max retries)
+- [x] Implement mint retry logic (re-queue up to MAX_RETRIES)
 - [ ] Add error alerting (logs, optional Telegram alerts to admin)
+- [x] Implement mint success/failure notifications to users (TelegramNotifier)
 - [ ] Implement admin authentication (login flow for web dashboard)
 - [ ] **🔖 git commit: retries + error handling + admin auth**
 - [ ] Mainnet deployment checklist (contract re-deploy to mainnet, env updates)
@@ -120,6 +121,6 @@
 | 0 · Foundations | ✅ Complete |
 | 1 · Contracts | ⬜ Not started |
 | 2 · Bot Onboarding | 🟡 Pending live e2e test |
-| 3 · Mini App | ⬜ Not started |
+| 3 · Mini App | 🟡 Backend done; frontend pending |
 | 4 · Admin + Batch Mint | 🟡 Backend done; frontend + live mint pending |
-| 5 · Hardening | ⬜ Not started |
+| 5 · Hardening | 🟡 Partially started (retries + notifications) |
