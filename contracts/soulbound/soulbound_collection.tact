@@ -31,6 +31,23 @@ message(0x5fcc3d14) Transfer {
 /// Exit code used when someone tries to transfer a soulbound badge.
 const SoulboundNotTransferable: Int = 1020;
 
+/// TEP-85 get_nft_data return: (init, index, collection_address, owner, content)
+/// Tact flattens a struct onto the TVM stack, so this stays spec-compatible.
+struct NftData {
+    init_flag: Int;
+    index: Int;
+    collection: Address;
+    owner: Address;
+    content: Cell;
+}
+
+/// TEP-85 get_collection_data return: (next_item_index, collection_content, owner)
+struct CollectionData {
+    next_item_index: Int;
+    content: Cell;
+    owner: Address;
+}
+
 contract SoulboundItem {
     index: Int as uint64;
     collection: Address;
@@ -50,8 +67,14 @@ contract SoulboundItem {
     }
 
     /// TEP-85 get_nft_data: (init, index, collection_address, owner, content)
-    get fun get_nft_data(): [Int, Int, Address, Address, Cell] {
-        return [0, self.index, self.collection, self.owner, self.content];
+    get fun get_nft_data(): NftData {
+        return NftData{
+            init_flag: 0,
+            index: self.index,
+            collection: self.collection,
+            owner: self.owner,
+            content: self.content,
+        };
     }
 }
 
@@ -95,8 +118,12 @@ contract SoulboundCollection with Ownable {
             .endCell();
     }
 
-    get fun get_collection_data(): [Int, Cell, Address] {
-        return [self.next_item_index, self.content, self.owner];
+    get fun get_collection_data(): CollectionData {
+        return CollectionData{
+            next_item_index: self.next_item_index,
+            content: self.content,
+            owner: self.owner,
+        };
     }
 
     get fun get_nft_address_by_index(index: Int): Address {
