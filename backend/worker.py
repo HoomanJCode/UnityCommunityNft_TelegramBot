@@ -120,13 +120,15 @@ class MintWorker:
                     # Re-queue for another attempt later.
                     transition_assignment(assignment, STATUS_QUEUED)
                 db.commit()
+                retry_count = assignment.retry_count
                 final_status = assignment.status
             logger.warning(
                 "mint failed for assignment %s (attempt %s)",
                 assignment_id,
-                assignment.retry_count,
+                retry_count,
             )
-            if self.notifier:
+            # Only notify the user once we stop retrying.
+            if self.notifier and final_status == STATUS_FAILED:
                 await self.notifier.notify(
                     telegram_id,
                     f"❌ Minting your '{badge_name}' badge failed: {e}",
@@ -138,6 +140,7 @@ class MintWorker:
             assignment = db.get(Assignment, assignment_id)
             assignment.tx_hash = tx_hash
             assignment.minted_at = datetime.now(timezone.utc)
+            assignment.error = None  # clear any stale retry error
             transition_assignment(assignment, STATUS_MINTED)
             db.commit()
         if self.notifier:
