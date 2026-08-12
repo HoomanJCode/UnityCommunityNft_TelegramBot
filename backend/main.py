@@ -48,7 +48,9 @@ def init_db() -> None:
     to Alembic migrations (alembic is already in requirements.txt).
     """
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables ready.")
+    # ASCII only: the Windows cp1252 console cannot encode emoji and would
+    # crash the boot log line.
+    print("* database tables ready")
 
 
 def main() -> None:

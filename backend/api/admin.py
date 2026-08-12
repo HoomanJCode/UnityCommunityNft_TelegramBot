@@ -5,24 +5,89 @@ These are the endpoints the admin dashboard (web/admin) will call:
     events       → CRUD for events
     assignments  → batch mint jobs (JSON list or CSV upload) + status control
 
-Note: authentication is NOT implemented yet (see Phase 5 · Hardening).
+Authentication: every /admin route (except /login and /health) requires a
+bearer token obtained from POST /admin/login when `ADMIN_PASSWORD` is set
+(see backend/api/auth.py). With no password configured, auth is disabled.
 """
 
+import asyncio
 import csv
+import hmac
 import io
+import os
+import time
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
+from backend.api.auth import (
+    auth_enabled,
+    extract_bearer_token,
+    issue_token,
+    verify_token,
+)
 from backend.db.models import Assignment, BadgeType, Event
 from backend.db.session import SessionLocal
 from backend.services.assignment import (
     create_assignments_for_phones,
     transition_assignment,
 )
+from backend.services.tonapi import TonAPIClient, from_env as tonapi_from_env
 
 # url_prefix means every route here is mounted under /admin.
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+
+# Simple in-memory brute-force brake: track the last login attempt time.
+_last_login_attempt: float = 0.0
+
+
+@admin_bp.before_request
+def require_auth():
+    """Gate every admin route behind a valid bearer token when auth is on."""
+    # The login endpoint must stay open (it issues the tokens), and /health
+    # is used by uptime probes that cannot hold a session. /auth/status is
+    # the dashboard's boot probe — it must answer before a token exists.
+    if not auth_enabled():
+        return None
+    if request.path in ("/admin/login", "/admin/auth/status", "/health"):
+        return None
+    if verify_token(extract_bearer_token()):
+        return None
+    return jsonify({"error": "authentication required"}), 401
+
+
+@admin_bp.get("/auth/status")
+def auth_status():
+    """Whether admin auth is enabled — the dashboard's boot probe.
+
+    Kept separate from /login so probing never consumes the login rate
+    limiter (which would throttle the operator's first real login attempt).
+    """
+    return jsonify({"enabled": auth_enabled()})
+
+
+@admin_bp.post("/login")
+def login():
+    """Exchange the shared password for a short-lived bearer token."""
+    global _last_login_attempt
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", "")
+
+    # If no password is configured there is nothing to log into — but a
+    # client calling /login then gets a token-free 403 rather than silence.
+    if not auth_enabled():
+        return jsonify({"error": "admin auth is not enabled (ADMIN_PASSWORD unset)"}), 403
+
+    # Rate limit: one attempt per second prevents fast dictionary attacks.
+    now = time.monotonic()
+    if now - _last_login_attempt < 1.0:
+        return jsonify({"error": "too many attempts, slow down"}), 429
+    _last_login_attempt = now
+
+    if not hmac.compare_digest(password.encode(), os.getenv("ADMIN_PASSWORD", "").encode()):
+        return jsonify({"error": "invalid password"}), 401
+
+    return jsonify({"token": issue_token()})
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -330,3 +395,54 @@ def update_assignment_status(assignment_id: int):
         db.commit()
         db.refresh(a)
         return jsonify(_assignment_to_dict(a))
+
+
+# ---------------------------------------------------------------------------
+# On-chain verification (TonAPI)
+# ---------------------------------------------------------------------------
+
+
+@admin_bp.get("/tonapi/collections/<address>")
+def verify_collection(address: str):
+    """Verify a deployed collection on-chain via TonAPI.
+
+    Returns the collection's metadata, owner and next item index so an admin
+    can confirm a deploy worked before minting. Without a TON_API_KEY the
+    endpoint returns 503 so the dashboard can show "TonAPI not configured".
+    """
+    client: TonAPIClient = tonapi_from_env()
+    if not client.enabled:
+        return jsonify({"error": "TON_API_KEY is not set"}), 503
+
+    try:
+        data = asyncio_run(client.get_collection(address))
+    except Exception as e:  # noqa: BLE001 - surface any network/API failure
+        return jsonify({"error": f"TonAPI request failed: {e}"}), 502
+
+    metadata = data.get("metadata") or {}
+    return jsonify(
+        {
+            "address": address,
+            "name": metadata.get("name"),
+            "description": metadata.get("description"),
+            "image": metadata.get("image"),
+            "owner": (data.get("owner") or {}).get("address"),
+            "next_item_index": data.get("next_item_index"),
+            "verified": data.get("verified", False),
+        }
+    )
+
+
+@admin_bp.get("/tonapi/accounts/<address>/balance")
+def account_balance(address: str):
+    """Return a wallet's balance (in TON) via TonAPI."""
+    client: TonAPIClient = tonapi_from_env()
+    if not client.enabled:
+        return jsonify({"error": "TON_API_KEY is not set"}), 503
+
+    try:
+        balance_nano = asyncio_run(client.get_balance(address))
+    except Exception as e:  # noqa: BLE001
+        return jsonify({"error": f"TonAPI request failed: {e}"}), 502
+
+    return jsonify({"address": address, "balance_ton": balance_nano / 1e9})

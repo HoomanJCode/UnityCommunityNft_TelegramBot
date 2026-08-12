@@ -43,10 +43,14 @@ class TONClient(Protocol):
 
 
 class Notifier(Protocol):
-    """Optional hook for notifying users about mint outcomes."""
+    """Optional hook for notifying users and admins about mint outcomes."""
 
     async def notify(self, telegram_id: int, text: str) -> None:
         """Send a message to the given Telegram user."""
+        ...
+
+    async def alert_admin(self, text: str) -> None:
+        """Alert the operator (e.g. a final mint failure)."""
         ...
 
 
@@ -135,12 +139,21 @@ class MintWorker:
                 assignment_id,
                 retry_count,
             )
-            # Only notify the user once we stop retrying.
+            # Only notify once we stop retrying: the user gets a failure
+            # message, and the operator gets a separate admin alert.
             if self.notifier and final_status == STATUS_FAILED:
-                await self.notifier.notify(
-                    telegram_id,
-                    f"❌ Minting your '{badge_name}' badge failed: {e}",
-                )
+                try:
+                    await self.notifier.notify(
+                        telegram_id,
+                        f"❌ Minting your '{badge_name}' badge failed: {e}",
+                    )
+                    await self.notifier.alert_admin(
+                        f"🚨 Mint failed permanently for '{badge_name}' "
+                        f"(assignment #{assignment_id}, user {telegram_id}): {e}"
+                    )
+                except Exception:  # noqa: BLE001 - a send failure must not
+                    # mask the already-committed DB state or the return status.
+                    logger.exception("failure notification send failed")
             return final_status
 
         # Step 4: mark as minted.
@@ -179,7 +192,16 @@ class MintWorker:
 
                 for aid in ids:
                     await self.process_one(aid)
-            except Exception:  # noqa: BLE001 - a bad job must not kill the loop
+            except Exception as e:  # noqa: BLE001 - a bad job must not kill the loop
                 logger.exception("worker iteration failed")
+                # Loop-level failures (DB issues, unexpected bugs) also reach
+                # the operator so nothing fails silently.
+                if self.notifier:
+                    try:
+                        await self.notifier.alert_admin(
+                            f"🚨 Mint worker loop error: {e}"
+                        )
+                    except Exception:  # noqa: BLE001 - alerting must not crash
+                        logger.exception("admin alert failed")
 
             await asyncio.sleep(poll_interval)

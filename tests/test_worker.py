@@ -34,13 +34,17 @@ class FakeTONClient:
 
 
 class FakeNotifier:
-    """Records notification calls."""
+    """Records notification + admin-alert calls."""
 
     def __init__(self):
         self.messages = []
+        self.alerts = []
 
     async def notify(self, telegram_id: int, text: str) -> None:
         self.messages.append((telegram_id, text))
+
+    async def alert_admin(self, text: str) -> None:
+        self.alerts.append(text)
 
 
 @pytest.fixture()
@@ -179,6 +183,22 @@ def test_process_one_does_not_notify_on_retry(db):
 
     # Re-queued for retry → no notification yet
     assert notifier.messages == []
+    assert notifier.alerts == []
+
+
+def test_process_one_alerts_admin_on_final_failure(db):
+    from backend.worker import MAX_RETRIES
+
+    _seed_queued(db, retry_count=MAX_RETRIES - 1)  # this attempt is the last
+    notifier = FakeNotifier()
+    worker = MintWorker(FakeTONClient(fail=True), notifier=notifier)
+
+    asyncio.run(worker.process_one(1))
+
+    # The user gets the failure notice AND the operator gets an admin alert.
+    assert len(notifier.messages) == 1
+    assert len(notifier.alerts) == 1
+    assert "failed" in notifier.alerts[0].lower()
 
 
 def test_process_one_skips_non_queued(db):
