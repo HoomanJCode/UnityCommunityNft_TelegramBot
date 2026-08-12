@@ -26,18 +26,23 @@ A concept for a Telegram-based NFT badge system:
 ## Repository layout
 
 ```
-bot/         Python Telegram bot (aiogram)
-backend/     FastAPI backend + mint worker + SQLite
+bot/         Python Telegram bot (python-telegram-bot)
+backend/     Flask backend + mint worker + SQLite
 contracts/   TON smart contracts (Tact)
 web/         Telegram Mini App + admin dashboard frontends
 PLAN.md      Full project description and plan
+TODO.md      Step-by-step task checklist with commit checkpoints
 ```
-
-> **Note:** This layout is the plan — the directories are not implemented yet.
 
 ## Status
 
-Early-stage demo. See [`PLAN.md`](PLAN.md) for the full project plan.
+- ✅ Phase 0 · Foundations — repo scaffold, DB models, bot + backend boot
+- ✅ Phase 2 · Bot Onboarding — /start, phone capture, user record, wallet prompt
+- ⬜ Phase 1 · Contracts, Phase 3 · Mini App, Phase 4 · Admin + Mint, Phase 5 · Hardening
+
+> **Note:** `aiogram`/`FastAPI` from the original plan were swapped for
+> `python-telegram-bot`/`Flask` — the original stack requires Rust to build
+> `pydantic-core`, which is unavailable in this environment.
 
 ## License
 

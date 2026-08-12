@@ -46,12 +46,12 @@
 
 **Exit criteria:** Phone captured; user record in SQLite.
 
-- [ ] Implement `/start` handler — welcome message + request_contact keyboard button
-- [ ] Implement phone contact handler — create/update user record (telegram_id, phone)
-- [ ] Add wallet-link prompt after phone capture (link to Mini App)
-- [ ] Write tests for user creation flow
-- [ ] **🔖 git commit: bot onboarding handlers + tests**
-- [ ] End-to-end test: bot → /start → share phone → user in SQLite
+- [x] Implement `/start` handler — welcome message + request_contact keyboard button
+- [x] Implement phone contact handler — create/update user record (telegram_id, phone)
+- [x] Add wallet-link prompt after phone capture (link to Mini App)
+- [x] Write tests for user creation flow
+- [x] **🔖 git commit: bot onboarding handlers + tests**
+- [ ] End-to-end test: bot → /start → share phone → user in SQLite (needs live BOT_TOKEN)
 - [ ] **🔖 git commit: bot onboarding verified (Phase 2 complete ✓)**
 
 ---
@@ -119,7 +119,7 @@
 |-------|--------|
 | 0 · Foundations | ✅ Complete |
 | 1 · Contracts | ⬜ Not started |
-| 2 · Bot Onboarding | ⬜ Not started |
+| 2 · Bot Onboarding | ✅ Complete |
 | 3 · Mini App | ⬜ Not started |
 | 4 · Admin + Batch Mint | ⬜ Not started |
 | 5 · Hardening | ⬜ Not started |
