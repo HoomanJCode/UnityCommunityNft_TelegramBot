@@ -6,10 +6,14 @@ from flask import Blueprint, jsonify, request
 
 from backend.db.models import Assignment, BadgeType, User
 from backend.db.session import SessionLocal
+from backend.services.assignment import STATUS_MINTED
 from backend.services.initdata import extract_telegram_id, verify_init_data
 from backend.services.user import link_wallet
 
 mini_app_bp = Blueprint("mini_app", __name__, url_prefix="/miniapp")
+
+# initData older than this is rejected (replay protection).
+INIT_DATA_MAX_AGE = 86400  # 24 hours
 
 
 def _bot_token() -> str:
@@ -22,7 +26,7 @@ def _authenticated_telegram_id() -> int | None:
     if not init_data:
         body = request.get_json(silent=True) or {}
         init_data = body.get("init_data") or body.get("initData")
-    fields = verify_init_data(init_data, _bot_token())
+    fields = verify_init_data(init_data, _bot_token(), max_age=INIT_DATA_MAX_AGE)
     return extract_telegram_id(fields)
 
 
@@ -74,7 +78,7 @@ def list_badges():
             .join(BadgeType, Assignment.badge_type_id == BadgeType.id)
             .filter(
                 Assignment.user_id == user.id,
-                Assignment.status == "minted",
+                Assignment.status == STATUS_MINTED,
             )
             .order_by(Assignment.minted_at.desc())
             .all()
