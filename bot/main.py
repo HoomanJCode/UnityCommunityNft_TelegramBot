@@ -15,6 +15,7 @@ from telegram import (
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from backend.db.session import SessionLocal
+from backend.services.assignment import normalize_phone
 from backend.services.user import upsert_user
 
 load_dotenv()
@@ -52,7 +53,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     message = update.effective_message
     contact = message.contact
     tg_user = update.effective_user
-    phone = contact.phone_number.lstrip("+")
+    phone = normalize_phone(contact.phone_number)
 
     with SessionLocal() as db:
         upsert_user(
