@@ -34,10 +34,10 @@
 - [x] Write unit tests for both contracts (Tact test framework — 10 sandbox tests)
 - [x] Compile contracts to `contracts/build/`
 - [x] **🔖 git commit: smart contracts + tests**
-- [ ] Create Python deploy scripts in `contracts/deploy/` (testnet)
-- [ ] Deploy transferable collection to TON testnet
-- [ ] Deploy soulbound collection to TON testnet
-- [ ] Verify mint works on testnet via explorer (manual or scripted)
+- [x] Create Python deploy scripts in `contracts/deploy/` (testnet)
+- [ ] Deploy transferable collection to TON testnet *(needs funded testnet wallet)*
+- [ ] Deploy soulbound collection to TON testnet *(needs funded testnet wallet)*
+- [ ] Verify mint works on testnet via explorer (manual or scripted) *(needs live deploy)*
 - [ ] **🔖 git commit: deploy scripts + testnet verification (Phase 1 complete ✓)**
 
 ---
@@ -60,13 +60,13 @@
 
 **Exit criteria:** User links wallet; address persisted; gallery shows owned badges.
 
-- [ ] Scaffold Mini App: Vite + React + `@tonconnect/ui-react`
-- [ ] Implement TON Connect — wallet connection UI
-- [ ] **🔖 git commit: mini app scaffold + TON Connect UI**
+- [x] Scaffold Mini App: Vite + React + `@tonconnect/ui-react`
+- [x] Implement TON Connect — wallet connection UI
+- [x] **🔖 git commit: mini app scaffold + TON Connect UI**
 - [x] Implement `initData` verification on backend (HMAC with bot token)
 - [x] Create `backend/api/mini_app.py` — wallet link endpoint, badge gallery endpoint
 - [x] Persist wallet address + connected_at in users table
-- [ ] Build badge gallery UI (owned badges from contract)
+- [x] Build badge gallery UI (owned badges from contract)
 - [x] **🔖 git commit: mini app wallet link + gallery backend**
 - [ ] End-to-end test: open Mini App → connect wallet → address stored → gallery loads
 - [ ] **🔖 git commit: mini app end-to-end verified (Phase 3 complete ✓)**
@@ -77,7 +77,7 @@
 
 **Exit criteria:** Mint 10-test-number batch end-to-end on testnet.
 
-- [ ] Scaffold admin frontend: Vite + React
+- [x] Scaffold admin frontend: Vite + React (badge/event CRUD + batch mint UI in `web/admin/`)
 - [x] Implement badge type CRUD (backend API)
 - [x] Implement event CRUD (backend API)
 - [x] Implement CSV upload / paste phone numbers for batch (backend API)
@@ -87,8 +87,8 @@
 - [x] Build `backend/worker.py` — background mint queue (asyncio task, pluggable TON client)
 - [x] Implement assignment status tracking (pending → queued → minting → minted | failed | needs_wallet)
 - [x] Implement Telegram notifications on mint success/failure
-- [ ] Integrate TonAPI (choose provider, set up key, wire up read calls)
-- [ ] **🔖 git commit: mint pipeline + notifications**
+- [x] Integrate TonAPI — `backend/services/tonapi.py` (balance, NFT item, collection reads) + `/admin/tonapi/*` verification endpoints
+- [x] **🔖 git commit: mint pipeline + notifications**
 - [ ] End-to-end test: admin creates badge & event → uploads 10 phone numbers → batch mint → all 10 minted on testnet
 - [ ] **🔖 git commit: batch mint verified (Phase 4 complete ✓)**
 
@@ -99,16 +99,16 @@
 **Exit criteria:** Runbook for going live.
 
 - [x] Implement mint retry logic (re-queue up to MAX_RETRIES)
-- [ ] Add error alerting (logs, optional Telegram alerts to admin)
+- [x] Add error alerting (logs, optional Telegram alerts to admin via `ADMIN_CHAT_ID`)
 - [x] Implement mint success/failure notifications to users (TelegramNotifier)
-- [ ] Implement admin authentication (login flow for web dashboard)
+- [x] Implement admin authentication (login flow for web dashboard — shared password → bearer tokens, auth off when unset)
 - [ ] **🔖 git commit: retries + error handling + admin auth**
-- [ ] Mainnet deployment checklist (contract re-deploy to mainnet, env updates)
-- [ ] Review and harden `.gitignore` for secrets
-- [ ] Write full `README.md` with setup instructions and runbook
+- [x] Mainnet deployment checklist → `docs/MAINNET_CHECKLIST.md`
+- [x] Review and harden `.gitignore` for secrets (added *.db / *.sqlite, keystore coverage)
+- [x] Write full `README.md` with setup instructions and runbook
 - [ ] **🔖 git commit: mainnet checklist + README + runbook**
 - [ ] Final end-to-end walkthrough on testnet (all flows)
-- [ ] Presentation prep — demo script, screenshots, key talking points
+- [ ] Presentation prep — demo script + talking points done in `docs/DEMO_SCRIPT.md`; screenshots pending live demo
 - [ ] **🔖 git commit: final polish (Phase 5 complete ✓)**
 
 ---
@@ -118,8 +118,8 @@
 | Phase | Status |
 |-------|--------|
 | 0 · Foundations | ✅ Complete |
-| 1 · Contracts | 🟡 Compiled + tested; testnet deploy pending |
+| 1 · Contracts | 🟡 Compiled + tested + deploy scripts; testnet deploy pending |
 | 2 · Bot Onboarding | 🟡 Pending live e2e test |
-| 3 · Mini App | 🟡 Backend done; frontend pending |
-| 4 · Admin + Batch Mint | 🟡 Backend done; frontend + live mint pending |
-| 5 · Hardening | 🟡 Partially started (retries + notifications) |
+| 3 · Mini App | 🟡 Frontend done; live e2e pending |
+| 4 · Admin + Batch Mint | 🟡 Backend + admin dashboard + TonAPI done; live mint pending |
+| 5 · Hardening | 🟡 Auth, alerts, checklist, .gitignore done; live e2e + screenshots pending |

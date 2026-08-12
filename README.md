@@ -143,12 +143,13 @@ UnityCommunityNftBot/
 │   ├── transferable/        #   TEP-62 badge collection
 │   ├── soulbound/           #   TEP-85 soulbound collection
 │   ├── build/               #   compiled artifacts (gitignored)
-│   ├── deploy/              #   deploy scripts (testnet, pending)
+│   ├── deploy/              #   deploy scripts (Python, testnet)
 │   └── tests/               #   sandbox test suites (10 tests)
-├── web/                     # Frontends (Vite + React, pending)
+├── web/                     # Frontends (Vite + React)
 │   ├── miniapp/             #   TON Connect wallet linking + badge gallery
-│   └── admin/               #   admin dashboard
-├── tests/                   # Python test suite (52 tests)
+│   └── admin/               #   admin dashboard (CRUD + batch mint + login)
+├── docs/                    # mainnet checklist + demo script
+├── tests/                   # Python test suite (68 tests)
 ├── PLAN.md                  # full project description and plan
 ├── TODO.md                  # step-by-step checklist with commit checkpoints
 └── README.md
@@ -195,7 +196,7 @@ python -m backend.services.ton   # runs MintWorker with the pytoniq client
 ### 2. Tests
 
 ```bash
-python -m pytest tests/ -v       # 52 tests, all offline (no network needed)
+python -m pytest tests/ -v       # 68 tests, all offline (no network needed)
 ```
 
 ### 3. Smart contracts (Tact)
@@ -207,23 +208,22 @@ npm run build                    # compiles to contracts/build/
 npm test                         # 10 sandbox tests for both collections
 ```
 
-> **Status:** both collections compile and their sandbox tests pass. Testnet
-> deployment is the remaining Phase 1 step (needs a funded testnet wallet).
-> Note that **Tact is deprecated** upstream in favor of Tolk (the compiler
-> still works and matches the project plan).
+> **Status:** both collections compile and their sandbox tests pass; deploy
+> scripts live in `contracts/deploy/`. Testnet deployment is the remaining
+> Phase 1 step (needs a funded testnet wallet). Note that **Tact is
+> deprecated** upstream in favor of Tolk (the compiler still works and
+> matches the project plan).
 
 ### 4. Frontends (Vite + React)
-
-Not scaffolded yet (tracked in `TODO.md`, Phase 3/4):
 
 ```bash
 cd web/miniapp    # TON Connect wallet linking + badge gallery
 npm install
 npm run dev       # http://localhost:5173 (proxies /miniapp → :8000)
 
-cd web/admin      # admin dashboard (badge/event CRUD, batch mint)
+cd web/admin      # admin dashboard (badge/event CRUD, batch mint, login)
 npm install
-npm run dev       # http://localhost:5174
+npm run dev       # http://localhost:5174 (proxies /admin → :8000)
 ```
 
 ---
@@ -234,12 +234,13 @@ npm run dev       # http://localhost:5174
 |---|---|---|
 | `BOT_TOKEN` | — | Telegram bot token (**required**) |
 | `TON_NETWORK` | `testnet` | `testnet` or `mainnet` |
-| `TON_API_KEY` | — | TonAPI key (read calls; integration pending) |
+| `TON_API_KEY` | — | TonAPI key — powers the on-chain verify endpoints (`/admin/tonapi/*`); unset = endpoints return 503 |
 | `DEPLOYER_MNEMONIC` | — | 24-word mnemonic of the minting hot wallet |
 | `DATABASE_URL` | `sqlite:///./data.db` | SQLAlchemy URL |
 | `MINI_APP_URL` | `http://localhost:5173` | Mini App origin (CORS + bot button) |
 | `ADMIN_WEB_URL` | `http://localhost:5174` | Admin dashboard origin (CORS) |
-| `ADMIN_PASSWORD` | `change_me` | Planned shared password for the dashboard |
+| `ADMIN_PASSWORD` | `change_me` | Shared password for the admin dashboard login; **empty = auth disabled** (dev mode) |
+| `ADMIN_CHAT_ID` | — | Telegram chat id of the operator; receives 🚨 mint-failure alerts |
 | `DEBUG` | `false` | SQL echo + Flask debug reloader |
 
 ---
@@ -248,10 +249,15 @@ npm run dev       # http://localhost:5174
 
 All responses are JSON.
 
-### Admin API (`/admin`) — no auth yet (Phase 5)
+### Admin API (`/admin`) — bearer-token auth when `ADMIN_PASSWORD` is set
+
+Every route except `/admin/login` and `/health` requires
+`Authorization: Bearer <token>` when a password is configured (see
+`backend/api/auth.py`). With no password, auth is disabled for local dev.
 
 | Method | Path | Description |
 |---|---|---|
+| POST | `/admin/login` | `{"password": "..."}` → `{"token": "..."}` (12 h TTL, rate-limited) |
 | GET/POST | `/admin/badge-types` | List / create badge types |
 | GET/PUT/DELETE | `/admin/badge-types/<id>` | Read / update / delete |
 | GET/POST | `/admin/events` | List / create events |
@@ -260,6 +266,8 @@ All responses are JSON.
 | POST | `/admin/assignments/upload` | Same, from a CSV file (`badge_type_id` + `file`) |
 | GET | `/admin/assignments` | List jobs, optional `?status=<status>` |
 | POST | `/admin/assignments/<id>/status` | Transition: `{"status": "queued"}` (409 on illegal jump) |
+| GET | `/admin/tonapi/collections/<address>` | Verify a deployed collection on-chain (needs `TON_API_KEY`) |
+| GET | `/admin/tonapi/accounts/<address>/balance` | Wallet balance in TON (needs `TON_API_KEY`) |
 
 ### Mini App API (`/miniapp`) — authenticated by Telegram `initData`
 
@@ -352,11 +360,11 @@ stay in sync — if one changes, change the other.
 | Phase | Status |
 |---|---|
 | 0 · Foundations | ✅ Complete |
-| 1 · Contracts | 🟡 Written, compiled, tested; testnet deploy pending |
+| 1 · Contracts | 🟡 Compiled + tested + deploy scripts; testnet deploy pending |
 | 2 · Bot Onboarding | 🟡 Code done; live e2e pending |
-| 3 · Mini App | 🟡 Backend done; frontend pending |
-| 4 · Admin + Batch Mint | 🟡 Backend done; frontend + live mint pending |
-| 5 · Hardening | 🟡 Retries + notifications done; admin auth/README pending |
+| 3 · Mini App | 🟡 Frontend done; live e2e pending |
+| 4 · Admin + Batch Mint | 🟡 Backend + dashboard + TonAPI done; live mint pending |
+| 5 · Hardening | 🟡 Auth, alerts, checklist, docs done; live e2e + screenshots pending |
 
 Live E2E steps (require a real bot token + testnet wallet):
 

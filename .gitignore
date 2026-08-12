@@ -54,6 +54,13 @@ keystore/
 # Telegram bot tokens, webhook certs
 *.pem
 
+# Local databases (dev SQLite lives next to the repo)
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+!tests/fixtures/*.db
+
 # ============================================================
 # Smart contracts — Hardhat
 # ============================================================
