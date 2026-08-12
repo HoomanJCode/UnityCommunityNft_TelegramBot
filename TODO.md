@@ -78,15 +78,15 @@
 **Exit criteria:** Mint 10-test-number batch end-to-end on testnet.
 
 - [ ] Scaffold admin frontend: Vite + React
-- [ ] Implement badge type CRUD (name, description, artwork, transferable/soulbound)
-- [ ] Implement event CRUD (name, description, date, assign badge type)
-- [ ] Implement CSV upload / paste phone numbers for batch
-- [ ] Create `backend/api/admin.py` — badge/event CRUD endpoints
-- [ ] **🔖 git commit: admin dashboard + CRUD APIs**
-- [ ] Build `backend/services/ton.py` — collection deploy trigger, TonAPI read calls
-- [ ] Build `backend/services/mint.py` — mint logic via pytoniq
-- [ ] Build `backend/worker.py` — background mint queue (asyncio task)
-- [ ] Implement assignment status tracking (pending → queued → minting → minted | failed | needs_wallet)
+- [x] Implement badge type CRUD (backend API)
+- [x] Implement event CRUD (backend API)
+- [x] Implement CSV upload / paste phone numbers for batch (backend API)
+- [x] Create `backend/api/admin.py` — badge/event CRUD endpoints
+- [x] **🔖 git commit: admin CRUD APIs**
+- [x] Build `backend/services/ton.py` — placeholder (pytoniq client pending Rust)
+- [ ] Build `backend/services/mint.py` — real mint logic via pytoniq (merged into worker.py; client stub)
+- [x] Build `backend/worker.py` — background mint queue (asyncio task, pluggable TON client)
+- [x] Implement assignment status tracking (pending → queued → minting → minted | failed | needs_wallet)
 - [ ] Implement Telegram notifications on mint success/failure
 - [ ] Integrate TonAPI (choose provider, set up key, wire up read calls)
 - [ ] **🔖 git commit: mint pipeline + notifications**
@@ -121,5 +121,5 @@
 | 1 · Contracts | ⬜ Not started |
 | 2 · Bot Onboarding | 🟡 Pending live e2e test |
 | 3 · Mini App | ⬜ Not started |
-| 4 · Admin + Batch Mint | ⬜ Not started |
+| 4 · Admin + Batch Mint | 🟡 Backend done; frontend + live mint pending |
 | 5 · Hardening | ⬜ Not started |
