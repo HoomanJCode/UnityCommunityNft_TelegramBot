@@ -14,17 +14,21 @@ Algorithm (https://core.telegram.org/bots/webapps#validating-data):
 import hashlib
 import hmac
 import json
+import time
 from urllib.parse import parse_qsl
 
 
 def verify_init_data(
     init_data: str,
     bot_token: str,
+    max_age: int | None = None,
 ) -> dict | None:
     """Verify Mini App initData and return the parsed fields.
 
     Returns a dict of fields (with `user` decoded to a dict) on success,
-    or None if the signature is invalid / missing.
+    or None if the signature is invalid / missing / stale.
+
+    `max_age` (seconds) rejects initData older than this to prevent replay.
     """
     if not init_data or not bot_token:
         return None
@@ -46,6 +50,14 @@ def verify_init_data(
 
     if not hmac.compare_digest(expected_hash, received_hash):
         return None
+
+    if max_age is not None:
+        try:
+            auth_date = int(fields.get("auth_date", 0))
+        except (ValueError, TypeError):
+            return None
+        if auth_date <= 0 or time.time() - auth_date > max_age:
+            return None
 
     user_raw = fields.get("user")
     if user_raw:
