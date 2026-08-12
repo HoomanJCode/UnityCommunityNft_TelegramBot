@@ -119,7 +119,7 @@
 |-------|--------|
 | 0 · Foundations | ✅ Complete |
 | 1 · Contracts | ⬜ Not started |
-| 2 · Bot Onboarding | ✅ Complete |
+| 2 · Bot Onboarding | 🟡 Pending live e2e test |
 | 3 · Mini App | ⬜ Not started |
 | 4 · Admin + Batch Mint | ⬜ Not started |
 | 5 · Hardening | ⬜ Not started |
