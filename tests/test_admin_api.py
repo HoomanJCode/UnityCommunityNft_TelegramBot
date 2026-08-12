@@ -56,6 +56,7 @@ def test_badge_type_crud(client):
 
 
 def test_create_badge_requires_name(client):
+    # A nameless badge is meaningless on-chain — API must reject it (400).
     assert client.post("/admin/badge-types", json={}).status_code == 400
 
 
@@ -136,6 +137,6 @@ def test_assignment_status_transition(client):
     assert r.status_code == 200
     assert r.get_json()["status"] == "queued"
 
-    # Invalid transition -> 409
+    # Invalid transition (pending -> minted skips the queue) -> 409.
     r = client.post(f"/admin/assignments/{a_id}/status", json={"status": "minted"})
     assert r.status_code == 409

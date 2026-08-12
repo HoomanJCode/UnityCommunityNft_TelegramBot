@@ -1,4 +1,12 @@
-"""Admin API — badge type & event management (Flask blueprint)."""
+"""Admin API — badge type & event management (Flask blueprint).
+
+These are the endpoints the admin dashboard (web/admin) will call:
+    badge-types  → CRUD for badge designs
+    events       → CRUD for events
+    assignments  → batch mint jobs (JSON list or CSV upload) + status control
+
+Note: authentication is NOT implemented yet (see Phase 5 · Hardening).
+"""
 
 import csv
 import io
@@ -13,6 +21,7 @@ from backend.services.assignment import (
     transition_assignment,
 )
 
+# url_prefix means every route here is mounted under /admin.
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
@@ -33,6 +42,7 @@ def _parse_bool(value) -> bool:
 
 
 def _badge_type_to_dict(bt: BadgeType) -> dict:
+    """Serialize a BadgeType row to the JSON shape the dashboard expects."""
     return {
         "id": bt.id,
         "name": bt.name,
@@ -47,8 +57,14 @@ def _badge_type_to_dict(bt: BadgeType) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Badge type CRUD
+# ---------------------------------------------------------------------------
+
+
 @admin_bp.get("/badge-types")
 def list_badge_types():
+    """List all badge types (newest order is by id, i.e. creation order)."""
     with SessionLocal() as db:
         items = db.query(BadgeType).order_by(BadgeType.id).all()
         return jsonify([_badge_type_to_dict(b) for b in items])
@@ -56,8 +72,10 @@ def list_badge_types():
 
 @admin_bp.post("/badge-types")
 def create_badge_type():
+    """Create a badge type; name is the only required field."""
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "").strip()
+    # Fail fast with a clear 400 instead of saving a nameless badge.
     if not name:
         return jsonify({"error": "name is required"}), 400
 
@@ -66,12 +84,13 @@ def create_badge_type():
         description=data.get("description"),
         image_url=data.get("image_url"),
         metadata_uri=data.get("metadata_uri"),
+        # is_soulbound decides which contract type gets deployed later.
         is_soulbound=_parse_bool(data.get("is_soulbound", False)),
     )
     with SessionLocal() as db:
         db.add(bt)
         db.commit()
-        db.refresh(bt)
+        db.refresh(bt)  # reload to pick up server-generated id/created_at
         return jsonify(_badge_type_to_dict(bt)), 201
 
 
@@ -126,8 +145,14 @@ def _event_to_dict(ev: Event) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Event CRUD
+# ---------------------------------------------------------------------------
+
+
 @admin_bp.get("/events")
 def list_events():
+    """List all events."""
     with SessionLocal() as db:
         items = db.query(Event).order_by(Event.id).all()
         return jsonify([_event_to_dict(e) for e in items])
@@ -200,16 +225,23 @@ def delete_event(event_id: int):
         return jsonify({"deleted": event_id})
 
 
+# ---------------------------------------------------------------------------
+# Batch mint assignments
+# ---------------------------------------------------------------------------
+
+
 @admin_bp.post("/assignments")
 def create_assignments():
     """Create assignments from a JSON list of phone numbers.
 
     Body: {"badge_type_id": 1, "phones": ["79991112233", ...]}
+    The response is a summary dict (created / needs_wallet / skipped / ...).
     """
     data = request.get_json(silent=True) or {}
     badge_type_id = data.get("badge_type_id")
     phones = data.get("phones") or []
 
+    # Validate the request shape before touching the DB.
     if not badge_type_id:
         return jsonify({"error": "badge_type_id is required"}), 400
     if not isinstance(phones, list) or not phones:
@@ -218,6 +250,7 @@ def create_assignments():
     with SessionLocal() as db:
         if not db.get(BadgeType, badge_type_id):
             return jsonify({"error": "badge_type not found"}), 404
+        # The heavy lifting (phone → user matching, dedupe) lives in the service.
         summary = create_assignments_for_phones(db, badge_type_id, phones)
     return jsonify(summary), 201
 
@@ -237,6 +270,8 @@ def upload_assignments_csv():
     if not file:
         return jsonify({"error": "file is required"}), 400
 
+    # utf-8-sig strips a BOM if present (Excel exports often include one).
+    # We only take the first column and ignore any header row.
     text = file.read().decode("utf-8-sig", errors="replace")
     phones = [row[0] for row in csv.reader(io.StringIO(text)) if row]
 
@@ -277,6 +312,7 @@ def update_assignment_status(assignment_id: int):
     """Transition an assignment to a new status.
 
     Body: {"status": "queued"}
+    The state machine (see services/assignment.py) rejects illegal jumps.
     """
     data = request.get_json(silent=True) or {}
     new_status = data.get("status")

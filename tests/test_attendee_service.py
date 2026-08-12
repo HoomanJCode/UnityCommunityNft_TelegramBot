@@ -39,6 +39,7 @@ def test_join_event_creates_attendee(db):
 
 
 def test_join_event_is_idempotent(db):
+    # Joining twice (e.g. user taps /join again) must not duplicate the row.
     _seed(db)
     join_event(db, 1, 1)
     attendee, created = join_event(db, 1, 1)

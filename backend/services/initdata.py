@@ -33,14 +33,18 @@ def verify_init_data(
     if not init_data or not bot_token:
         return None
 
+    # The `hash` field is the signature — pop it before building the string
+    # that must be signed, otherwise the hashes would never match.
     fields = dict(parse_qsl(init_data, keep_blank_values=True))
     received_hash = fields.pop("hash", None)
     if not received_hash:
         return None
 
+    # Step 2-3 of the Telegram algorithm: sort pairs and join with newlines.
     data_check_string = "\n".join(
         f"{key}={value}" for key, value in sorted(fields.items())
     )
+    # Step 4: derive the secret from the bot token, then HMAC the string.
     secret_key = hmac.new(
         b"WebAppData", bot_token.encode(), hashlib.sha256
     ).digest()
@@ -48,9 +52,12 @@ def verify_init_data(
         secret_key, data_check_string.encode(), hashlib.sha256
     ).hexdigest()
 
+    # compare_digest is constant-time — don't replace with `==`.
     if not hmac.compare_digest(expected_hash, received_hash):
         return None
 
+    # Replay protection: a validly-signed but old initData string must be
+    # rejected, otherwise an attacker could reuse a captured one forever.
     if max_age is not None:
         try:
             auth_date = int(fields.get("auth_date", 0))
@@ -59,6 +66,7 @@ def verify_init_data(
         if auth_date <= 0 or time.time() - auth_date > max_age:
             return None
 
+    # Telegram sends `user` as a JSON string; decode it for convenience.
     user_raw = fields.get("user")
     if user_raw:
         try:

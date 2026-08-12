@@ -29,15 +29,21 @@ from backend.services.user import upsert_user
 
 load_dotenv()
 
+# A bot without a token is useless — fail loudly at startup, not later.
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     sys.exit("BOT_TOKEN is not set in .env file")
 
+# Where the wallet-connect Mini App lives (t.me/<bot>/<app> or a web URL).
 MINI_APP_URL = os.getenv("MINI_APP_URL", "https://t.me/your_bot/miniapp")
 
 
 def _phone_keyboard() -> ReplyKeyboardMarkup:
-    """Return a keyboard with a 'Share phone number' button."""
+    """Return a keyboard with a 'Share phone number' button.
+
+    request_contact=True makes Telegram hand the user's phone straight to the
+    bot (with the user's consent) instead of them typing it.
+    """
     return ReplyKeyboardMarkup(
         [[KeyboardButton("📱 Share phone number", request_contact=True)]],
         resize_keyboard=True,
@@ -58,12 +64,18 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle shared contact — create or update the user record."""
+    """Handle shared contact — create or update the user record.
+
+    This is the core onboarding step: it links the Telegram identity to a phone
+    number, which is exactly what admins later use to target badge mints.
+    """
     message = update.effective_message
     contact = message.contact
     tg_user = update.effective_user
+    # Normalize so "+7 999 111-22-33" matches the digits-only admin uploads.
     phone = normalize_phone(contact.phone_number)
 
+    # Upsert (not insert): a returning user gets their phone refreshed.
     with SessionLocal() as db:
         upsert_user(
             db,
@@ -73,6 +85,7 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         db.commit()
 
+    # Step two of onboarding: point the user at the Mini App to connect a wallet.
     wallet_kb = InlineKeyboardMarkup(
         [[InlineKeyboardButton("🔗 Connect TON Wallet", url=MINI_APP_URL)]]
     )
@@ -146,6 +159,8 @@ def main() -> None:
     """Build and run the bot application."""
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # Handler registration order matters little here, but the callback pattern
+    # must match exactly what /join sends as callback_data ("join:<id>").
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("join", cmd_join))
     app.add_handler(MessageHandler(filters.CONTACT, handle_contact))

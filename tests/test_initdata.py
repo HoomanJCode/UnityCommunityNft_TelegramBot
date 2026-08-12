@@ -47,11 +47,12 @@ def test_extract_telegram_id():
 
 
 def test_verify_rejects_tampered_data():
+    # Core security property: any edit to the data breaks the HMAC, so a
+    # MITM cannot change the user id or auth_date of a captured initData.
     init_data = _make_init_data(
         BOT_TOKEN,
         {"auth_date": "1700000000", "user": json.dumps({"id": 42})},
     )
-    # Tamper: change a value without recomputing the hash
     tampered = init_data.replace("1700000000", "1700000001")
     assert verify_init_data(tampered, BOT_TOKEN) is None
 
@@ -70,6 +71,7 @@ def test_verify_rejects_missing_hash():
 
 
 def test_verify_rejects_stale_init_data():
+    # Replay protection: a signed-but-ancient initData must be refused.
     old = str(int(time.time()) - 100000)  # way older than max_age
     init_data = _make_init_data(
         BOT_TOKEN, {"auth_date": old, "user": json.dumps({"id": 42})}

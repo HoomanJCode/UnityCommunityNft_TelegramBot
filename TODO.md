@@ -84,10 +84,10 @@
 - [x] Create `backend/api/admin.py` — badge/event CRUD endpoints
 - [x] **🔖 git commit: admin CRUD APIs**
 - [x] Build `backend/services/ton.py` — placeholder (pytoniq client pending Rust)
-- [ ] Build `backend/services/mint.py` — real mint logic via pytoniq (merged into worker.py; client stub)
+- [x] Build `backend/services/ton.py` — real pytoniq mint client (`PytoniqTONClient`; mint logic runs in worker.py)
 - [x] Build `backend/worker.py` — background mint queue (asyncio task, pluggable TON client)
 - [x] Implement assignment status tracking (pending → queued → minting → minted | failed | needs_wallet)
-- [ ] Implement Telegram notifications on mint success/failure
+- [x] Implement Telegram notifications on mint success/failure
 - [ ] Integrate TonAPI (choose provider, set up key, wire up read calls)
 - [ ] **🔖 git commit: mint pipeline + notifications**
 - [ ] End-to-end test: admin creates badge & event → uploads 10 phone numbers → batch mint → all 10 minted on testnet

@@ -1,4 +1,8 @@
-"""Attendee service — user joins events."""
+"""Attendee service — users join events.
+
+Backs the /join bot command. An attendee row just says "user X registered for
+event Y"; badge minting is driven separately through assignments.
+"""
 
 from sqlalchemy.orm import Session
 
@@ -10,7 +14,10 @@ def join_event(db: Session, event_id: int, user_id: int) -> tuple[Attendee, bool
 
     Returns (attendee, created) — `created` is False if already joined.
     Raises ValueError if the event or user does not exist.
+
+    Idempotent on purpose: tapping /join twice must not create duplicates.
     """
+    # Validate both foreign keys first so we never write a dangling row.
     event = db.get(Event, event_id)
     if event is None:
         raise ValueError(f"event {event_id} not found")
@@ -19,6 +26,7 @@ def join_event(db: Session, event_id: int, user_id: int) -> tuple[Attendee, bool
     if user is None:
         raise ValueError(f"user {user_id} not found")
 
+    # Already joined → return the existing row without inserting.
     existing = (
         db.query(Attendee)
         .filter(Attendee.event_id == event_id, Attendee.user_id == user_id)
