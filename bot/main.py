@@ -4,7 +4,14 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    Update,
+)
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 from backend.db.models import User
@@ -15,6 +22,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     sys.exit("BOT_TOKEN is not set in .env file")
+
+MINI_APP_URL = os.getenv("MINI_APP_URL", "https://t.me/your_bot/miniapp")
 
 
 def _phone_keyboard() -> ReplyKeyboardMarkup:
@@ -58,10 +67,17 @@ async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             db.add(user)
         db.commit()
 
+        wallet_kb = InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🔗 Connect TON Wallet", url=MINI_APP_URL)]]
+        )
         await update.message.reply_text(
             f"✅ Phone number {contact.phone_number} saved!\n\n"
             "Next step: connect your TON wallet to receive NFT badges.",
             reply_markup=ReplyKeyboardRemove(),
+        )
+        await update.message.reply_text(
+            "🔗 Tap below to open the Mini App and connect your Telegram Wallet:",
+            reply_markup=wallet_kb,
         )
 
 
