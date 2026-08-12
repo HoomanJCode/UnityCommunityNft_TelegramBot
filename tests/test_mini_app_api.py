@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import json
+import time
 from urllib.parse import urlencode
 
 import pytest
@@ -49,7 +50,7 @@ def client(monkeypatch):
 
 def _init_data(user_id: int = 42) -> str:
     return _make_init_data(
-        {"auth_date": "1700000000", "user": json.dumps({"id": user_id})}
+        {"auth_date": str(int(time.time())), "user": json.dumps({"id": user_id})}
     )
 
 

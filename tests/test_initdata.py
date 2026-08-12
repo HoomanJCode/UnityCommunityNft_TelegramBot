@@ -3,6 +3,7 @@
 import hashlib
 import hmac
 import json
+import time
 from urllib.parse import urlencode
 
 from backend.services.initdata import extract_telegram_id, verify_init_data
@@ -66,3 +67,19 @@ def test_verify_rejects_wrong_token():
 def test_verify_rejects_missing_hash():
     assert verify_init_data("auth_date=1700000000", BOT_TOKEN) is None
     assert verify_init_data("", BOT_TOKEN) is None
+
+
+def test_verify_rejects_stale_init_data():
+    old = str(int(time.time()) - 100000)  # way older than max_age
+    init_data = _make_init_data(
+        BOT_TOKEN, {"auth_date": old, "user": json.dumps({"id": 42})}
+    )
+    assert verify_init_data(init_data, BOT_TOKEN, max_age=60) is None
+
+
+def test_verify_accepts_fresh_init_data():
+    now = str(int(time.time()))
+    init_data = _make_init_data(
+        BOT_TOKEN, {"auth_date": now, "user": json.dumps({"id": 42})}
+    )
+    assert verify_init_data(init_data, BOT_TOKEN, max_age=60) is not None

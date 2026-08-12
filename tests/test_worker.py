@@ -153,8 +153,10 @@ def test_process_one_notifies_on_success(db):
     assert "minted" in text
 
 
-def test_process_one_notifies_on_failure(db):
-    _seed_queued(db)
+def test_process_one_notifies_on_final_failure(db):
+    from backend.worker import MAX_RETRIES
+
+    _seed_queued(db, retry_count=MAX_RETRIES - 1)  # this attempt is the last
     notifier = FakeNotifier()
     worker = MintWorker(FakeTONClient(fail=True), notifier=notifier)
 
@@ -164,6 +166,17 @@ def test_process_one_notifies_on_failure(db):
     telegram_id, text = notifier.messages[0]
     assert telegram_id == 1
     assert "failed" in text
+
+
+def test_process_one_does_not_notify_on_retry(db):
+    notifier = FakeNotifier()
+    worker = MintWorker(FakeTONClient(fail=True), notifier=notifier)
+
+    _seed_queued(db)
+    asyncio.run(worker.process_one(1))
+
+    # Re-queued for retry → no notification yet
+    assert notifier.messages == []
 
 
 def test_process_one_skips_non_queued(db):
