@@ -1,17 +1,16 @@
 # Telegram Bot
-aiogram>=3.7,<4.0
+python-telegram-bot>=22.0,<23.0
 
 # Backend API
-fastapi>=0.115,<1.0
-uvicorn[standard]>=0.32,<1.0
-python-multipart>=0.0.9,<1.0
+flask>=3.1,<4.0
+flask-cors>=6.0,<7.0
 
 # Database
 sqlalchemy>=2.0,<3.0
 alembic>=1.13,<2.0
 
 # TON Blockchain
-pytoniq>=0.1.50,<1.0
+pytoniq>=0.1.40,<1.0
 tonsdk>=1.0,<2.0
 
 # Utilities
