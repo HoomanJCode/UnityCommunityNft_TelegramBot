@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -8,9 +8,13 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    create_engine,
 )
-from sqlalchemy.orm import DeclarativeBase, relationship, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, relationship
+
+
+def utcnow() -> datetime:
+    """Return the current UTC datetime (timezone-aware)."""
+    return datetime.now(timezone.utc)
 
 
 class Base(DeclarativeBase):
@@ -26,7 +30,7 @@ class User(Base):
     phone = Column(String(20), nullable=True, index=True)
     wallet_address = Column(String(128), nullable=True)
     wallet_connected_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
 
     attendees = relationship("Attendee", back_populates="user")
     assignments = relationship("Assignment", back_populates="user")
@@ -47,7 +51,7 @@ class BadgeType(Base):
     collection_address = Column(String(128), nullable=True)
     supply = Column(Integer, default=0, nullable=False)
     deployed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
 
     events = relationship("Event", back_populates="badge_type")
     assignments = relationship("Assignment", back_populates="badge_type")
@@ -78,7 +82,7 @@ class Attendee(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     event_id = Column(Integer, ForeignKey("events.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    joined_at = Column(DateTime, default=utcnow, nullable=False)
 
     event = relationship("Event", back_populates="attendees")
     user = relationship("User", back_populates="attendees")
@@ -102,7 +106,7 @@ class Assignment(Base):
     # status: pending → queued → minting → minted | failed | needs_wallet
     tx_hash = Column(String(128), nullable=True)
     error = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
     minted_at = Column(DateTime, nullable=True)
 
     badge_type = relationship("BadgeType", back_populates="assignments")
