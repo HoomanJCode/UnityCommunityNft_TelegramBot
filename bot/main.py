@@ -4,8 +4,11 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+
+from backend.db.models import User
+from backend.db.session import SessionLocal
 
 load_dotenv()
 
@@ -35,11 +38,39 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def handle_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle shared contact — create or update the user record."""
+    contact = update.message.contact
+    tg_user = update.effective_user
+    phone = contact.phone_number.lstrip("+")
+
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.telegram_id == tg_user.id).first()
+        if user:
+            user.phone = phone
+            user.username = tg_user.username
+        else:
+            user = User(
+                telegram_id=tg_user.id,
+                username=tg_user.username,
+                phone=phone,
+            )
+            db.add(user)
+        db.commit()
+
+        await update.message.reply_text(
+            f"✅ Phone number {contact.phone_number} saved!\n\n"
+            "Next step: connect your TON wallet to receive NFT badges.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+
+
 def main() -> None:
     """Build and run the bot application."""
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(MessageHandler(filters.CONTACT, handle_contact))
 
     print("🚀 Bot polling started...")
     app.run_polling()
