@@ -31,6 +31,16 @@ class FakeTONClient:
         return "tx-abc123"
 
 
+class FakeNotifier:
+    """Records notification calls."""
+
+    def __init__(self):
+        self.messages = []
+
+    async def notify(self, telegram_id: int, text: str) -> None:
+        self.messages.append((telegram_id, text))
+
+
 @pytest.fixture()
 def db(monkeypatch):
     engine = create_engine(
@@ -43,10 +53,25 @@ def db(monkeypatch):
     return Session()
 
 
-def _seed_queued(db, *, wallet="EQD...", collection="EQAbc...", status=STATUS_QUEUED):
+def _seed_queued(
+    db,
+    *,
+    wallet="EQD...",
+    collection="EQAbc...",
+    status=STATUS_QUEUED,
+    retry_count=0,
+):
     db.add(BadgeType(id=1, name="B", collection_address=collection))
     db.add(User(id=1, telegram_id=1, wallet_address=wallet))
-    db.add(Assignment(id=1, badge_type_id=1, user_id=1, status=status))
+    db.add(
+        Assignment(
+            id=1,
+            badge_type_id=1,
+            user_id=1,
+            status=status,
+            retry_count=retry_count,
+        )
+    )
     db.commit()
 
 
@@ -87,8 +112,24 @@ def test_process_one_fails_when_no_collection(db):
     assert "collection" in a.error
 
 
-def test_process_one_records_mint_error(db):
+def test_process_one_retries_after_failure(db):
     _seed_queued(db)
+    worker = MintWorker(FakeTONClient(fail=True))
+
+    result = asyncio.run(worker.process_one(1))
+
+    # First failure → re-queued for retry
+    assert result == STATUS_QUEUED
+    a = db.get(Assignment, 1)
+    assert a.status == STATUS_QUEUED
+    assert a.retry_count == 1
+    assert a.error == "mint boom"
+
+
+def test_process_one_gives_up_after_max_retries(db):
+    from backend.worker import MAX_RETRIES
+
+    _seed_queued(db, retry_count=MAX_RETRIES - 1)
     worker = MintWorker(FakeTONClient(fail=True))
 
     result = asyncio.run(worker.process_one(1))
@@ -96,7 +137,33 @@ def test_process_one_records_mint_error(db):
     assert result == STATUS_FAILED
     a = db.get(Assignment, 1)
     assert a.status == STATUS_FAILED
-    assert a.error == "mint boom"
+    assert a.retry_count == MAX_RETRIES
+
+
+def test_process_one_notifies_on_success(db):
+    _seed_queued(db)
+    notifier = FakeNotifier()
+    worker = MintWorker(FakeTONClient(), notifier=notifier)
+
+    asyncio.run(worker.process_one(1))
+
+    assert len(notifier.messages) == 1
+    telegram_id, text = notifier.messages[0]
+    assert telegram_id == 1
+    assert "minted" in text
+
+
+def test_process_one_notifies_on_failure(db):
+    _seed_queued(db)
+    notifier = FakeNotifier()
+    worker = MintWorker(FakeTONClient(fail=True), notifier=notifier)
+
+    asyncio.run(worker.process_one(1))
+
+    assert len(notifier.messages) == 1
+    telegram_id, text = notifier.messages[0]
+    assert telegram_id == 1
+    assert "failed" in text
 
 
 def test_process_one_skips_non_queued(db):
