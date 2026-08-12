@@ -79,6 +79,41 @@ badges** that admins mint in bulk from a list of phone numbers.
 > swapped for `python-telegram-bot`/`Flask` because `pydantic-core` requires
 > Rust to build, which was unavailable in the original environment.
 
+### Project diagram
+
+```mermaid
+flowchart TB
+    U[Telegram user] -->|/start · phone · /join · notifications| BOT
+    U -->|connect wallet · badge gallery| MA
+    A[Admin] --> AD
+
+    subgraph Backend["Python backend · Flask"]
+        BOT["Telegram bot<br/>(python-telegram-bot)"]
+        API["Admin API + Mini App API"]
+        W["Mint worker<br/>(asyncio)"]
+        DB[("SQLite")]
+    end
+
+    subgraph Frontend["Frontends · Vite + React"]
+        MA["Mini App<br/>(TON Connect)"]
+        AD["Admin dashboard"]
+    end
+
+    subgraph TON["TON blockchain · testnet"]
+        C1["BadgeCollection<br/>TEP-62 transferable"]
+        C2["SoulboundCollection<br/>TEP-85 soulbound"]
+    end
+
+    AD -->|badge/event CRUD · batch mint| API
+    MA -->|initData + wallet link| API
+    API <--> DB
+    BOT <--> DB
+    W <--> DB
+    W -->|mint via pytoniq| C1
+    W -->|mint via pytoniq| C2
+    BOT -->|mint result notifications| U
+```
+
 ### Key design decisions
 
 | Decision | Why |
@@ -95,13 +130,28 @@ badges** that admins mint in bulk from a list of phone numbers.
 ## Repository layout
 
 ```
-bot/         Python Telegram bot (python-telegram-bot)
-backend/     Flask backend + mint worker + SQLite
-contracts/   Tact smart contracts (TEP-62 + TEP-85)
-web/         Telegram Mini App + admin dashboard frontends
-tests/       Python test suite
-PLAN.md      Full project description and plan
-TODO.md      Step-by-step task checklist with commit checkpoints
+UnityCommunityNftBot/
+├── bot/                     # Telegram bot (python-telegram-bot)
+│   └── main.py              # /start, phone capture, /join, wallet prompt
+├── backend/                 # Flask backend + mint worker
+│   ├── main.py              # Flask entry point (health, blueprints, DB init)
+│   ├── api/                 # admin.py + mini_app.py (Flask blueprints)
+│   ├── db/                  # SQLAlchemy models + session factory
+│   ├── services/            # assignment, attendee, initdata, notify, ton, user
+│   └── worker.py            # mint queue worker (atomic claims, retries, notify)
+├── contracts/               # Tact smart contracts
+│   ├── transferable/        #   TEP-62 badge collection
+│   ├── soulbound/           #   TEP-85 soulbound collection
+│   ├── build/               #   compiled artifacts (gitignored)
+│   ├── deploy/              #   deploy scripts (testnet, pending)
+│   └── tests/               #   sandbox test suites (10 tests)
+├── web/                     # Frontends (Vite + React, pending)
+│   ├── miniapp/             #   TON Connect wallet linking + badge gallery
+│   └── admin/               #   admin dashboard
+├── tests/                   # Python test suite (52 tests)
+├── PLAN.md                  # full project description and plan
+├── TODO.md                  # step-by-step checklist with commit checkpoints
+└── README.md
 ```
 
 ---
@@ -154,12 +204,13 @@ python -m pytest tests/ -v       # 52 tests, all offline (no network needed)
 cd contracts
 npm install
 npm run build                    # compiles to contracts/build/
-npm test                         # sandbox tests for both collections
+npm test                         # 10 sandbox tests for both collections
 ```
 
-> **Status:** the contract source is written (`contracts/transferable/`,
-> `contracts/soulbound/`). Note that **Tact is deprecated** upstream in favor
-> of Tolk (the compiler still works and matches the project plan).
+> **Status:** both collections compile and their sandbox tests pass. Testnet
+> deployment is the remaining Phase 1 step (needs a funded testnet wallet).
+> Note that **Tact is deprecated** upstream in favor of Tolk (the compiler
+> still works and matches the project plan).
 
 ### 4. Frontends (Vite + React)
 
@@ -231,6 +282,25 @@ and rejected if older than 24 h (replay protection).
 
 ## How the mint pipeline works
 
+```mermaid
+sequenceDiagram
+    participant A as Admin
+    participant API as Admin API
+    participant DB as SQLite
+    participant W as Mint worker
+    participant T as TON testnet
+    participant U as User
+
+    A->>API: upload/paste phone numbers
+    API->>DB: create assignments (pending / needs_wallet)
+    W->>DB: poll for queued assignments
+    W->>T: Mint message (owner = user wallet)
+    T->>T: deploy NFT item directly to user
+    W->>DB: mark minted + tx hash
+    W->>U: 🎉 badge minted notification
+    Note over W,T: failures → retry (max 3) → ❌ notification
+```
+
 Each badge grant is an **assignment** row that moves through a strict state
 machine:
 
@@ -282,7 +352,7 @@ stay in sync — if one changes, change the other.
 | Phase | Status |
 |---|---|
 | 0 · Foundations | ✅ Complete |
-| 1 · Contracts | 🟡 Written, compile pending |
+| 1 · Contracts | 🟡 Written, compiled, tested; testnet deploy pending |
 | 2 · Bot Onboarding | 🟡 Code done; live e2e pending |
 | 3 · Mini App | 🟡 Backend done; frontend pending |
 | 4 · Admin + Batch Mint | 🟡 Backend done; frontend + live mint pending |
