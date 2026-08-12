@@ -1,0 +1,16 @@
+{
+  "projects": [
+    {
+      "name": "badge_collection",
+      "path": "./transferable/badge_collection.tact",
+      "output": "./build/transferable",
+      "parameters": ["owner", "content"]
+    },
+    {
+      "name": "soulbound_collection",
+      "path": "./soulbound/soulbound_collection.tact",
+      "output": "./build/soulbound",
+      "parameters": ["owner", "content"]
+    }
+  ]
+}
