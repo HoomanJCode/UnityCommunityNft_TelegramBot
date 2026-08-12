@@ -25,6 +25,9 @@ from backend.services.assignment import (
 
 logger = logging.getLogger(__name__)
 
+# Maximum mint attempts before an assignment is marked failed permanently.
+MAX_RETRIES = 3
+
 
 class TONClient(Protocol):
     """Minimal interface for minting an NFT on TON."""
@@ -34,11 +37,24 @@ class TONClient(Protocol):
         ...
 
 
+class Notifier(Protocol):
+    """Optional hook for notifying users about mint outcomes."""
+
+    async def notify(self, telegram_id: int, text: str) -> None:
+        """Send a message to the given Telegram user."""
+        ...
+
+
 class MintWorker:
     """Polls the assignment queue and mints badges via a TON client."""
 
-    def __init__(self, ton_client: TONClient) -> None:
+    def __init__(
+        self,
+        ton_client: TONClient,
+        notifier: Notifier | None = None,
+    ) -> None:
         self.ton_client = ton_client
+        self.notifier = notifier
 
     async def process_one(self, assignment_id: int) -> str:
         """Process a single assignment; returns its final status."""
@@ -73,6 +89,8 @@ class MintWorker:
 
             wallet = user.wallet_address
             collection = badge_type.collection_address
+            telegram_id = user.telegram_id
+            badge_name = badge_type.name
 
         # Step 2: atomically claim the assignment (queued -> minting).
         # A conditional UPDATE ensures only one worker can claim it.
@@ -96,10 +114,24 @@ class MintWorker:
             with SessionLocal() as db:
                 assignment = db.get(Assignment, assignment_id)
                 assignment.error = str(e)
+                assignment.retry_count += 1
                 transition_assignment(assignment, STATUS_FAILED)
+                if assignment.retry_count < MAX_RETRIES:
+                    # Re-queue for another attempt later.
+                    transition_assignment(assignment, STATUS_QUEUED)
                 db.commit()
-            logger.exception("mint failed for assignment %s", assignment_id)
-            return STATUS_FAILED
+                final_status = assignment.status
+            logger.warning(
+                "mint failed for assignment %s (attempt %s)",
+                assignment_id,
+                assignment.retry_count,
+            )
+            if self.notifier:
+                await self.notifier.notify(
+                    telegram_id,
+                    f"❌ Minting your '{badge_name}' badge failed: {e}",
+                )
+            return final_status
 
         # Step 4: mark as minted.
         with SessionLocal() as db:
@@ -108,6 +140,12 @@ class MintWorker:
             assignment.minted_at = datetime.now(timezone.utc)
             transition_assignment(assignment, STATUS_MINTED)
             db.commit()
+        if self.notifier:
+            await self.notifier.notify(
+                telegram_id,
+                f"🎉 Your '{badge_name}' badge was minted!\n"
+                f"tx: {tx_hash}",
+            )
         return STATUS_MINTED
 
     async def run_loop(self, poll_interval: float = 5.0) -> None:
