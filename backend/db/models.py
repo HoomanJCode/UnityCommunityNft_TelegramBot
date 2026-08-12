@@ -105,6 +105,7 @@ class Assignment(Base):
         index=True,
     )
     # status: pending → queued → minting → minted | failed | needs_wallet
+    retry_count = Column(Integer, default=0, nullable=False)
     tx_hash = Column(String(128), nullable=True)
     error = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
