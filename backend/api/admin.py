@@ -1,11 +1,14 @@
 """Admin API — badge type & event management (Flask blueprint)."""
 
+import csv
+import io
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
 from backend.db.models import BadgeType, Event
 from backend.db.session import SessionLocal
+from backend.services.assignment import create_assignments_for_phones
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -178,3 +181,46 @@ def delete_event(event_id: int):
         db.delete(ev)
         db.commit()
         return jsonify({"deleted": event_id})
+
+
+@admin_bp.post("/assignments")
+def create_assignments():
+    """Create assignments from a JSON list of phone numbers.
+
+    Body: {"badge_type_id": 1, "phones": ["79991112233", ...]}
+    """
+    data = request.get_json(silent=True) or {}
+    badge_type_id = data.get("badge_type_id")
+    phones = data.get("phones") or []
+
+    if not badge_type_id:
+        return jsonify({"error": "badge_type_id is required"}), 400
+    if not isinstance(phones, list) or not phones:
+        return jsonify({"error": "phones must be a non-empty list"}), 400
+
+    with SessionLocal() as db:
+        summary = create_assignments_for_phones(db, badge_type_id, phones)
+    return jsonify(summary), 201
+
+
+@admin_bp.post("/assignments/upload")
+def upload_assignments_csv():
+    """Create assignments from an uploaded CSV file.
+
+    The CSV must contain one phone number per line, optionally with a header.
+    Form fields: badge_type_id (int), file (CSV upload).
+    """
+    badge_type_id = request.form.get("badge_type_id", type=int)
+    file = request.files.get("file")
+
+    if not badge_type_id:
+        return jsonify({"error": "badge_type_id is required"}), 400
+    if not file:
+        return jsonify({"error": "file is required"}), 400
+
+    text = file.read().decode("utf-8-sig", errors="replace")
+    phones = [row[0] for row in csv.reader(io.StringIO(text)) if row]
+
+    with SessionLocal() as db:
+        summary = create_assignments_for_phones(db, badge_type_id, phones)
+    return jsonify(summary), 201
