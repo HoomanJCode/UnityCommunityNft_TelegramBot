@@ -7,6 +7,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 
 from backend.api.admin import admin_bp
+from backend.api.mini_app import mini_app_bp
 from backend.db.models import Base
 from backend.db.session import engine
 
@@ -23,6 +24,7 @@ CORS(
 )
 
 app.register_blueprint(admin_bp)
+app.register_blueprint(mini_app_bp)
 
 
 @app.route("/health")
