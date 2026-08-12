@@ -69,7 +69,7 @@ def create_badge_type():
 @admin_bp.get("/badge-types/<int:badge_type_id>")
 def get_badge_type(badge_type_id: int):
     with SessionLocal() as db:
-        bt = db.query(BadgeType).get(badge_type_id)
+        bt = db.get(BadgeType, badge_type_id)
         if not bt:
             return jsonify({"error": "not found"}), 404
         return jsonify(_badge_type_to_dict(bt))
@@ -79,7 +79,7 @@ def get_badge_type(badge_type_id: int):
 def update_badge_type(badge_type_id: int):
     data = request.get_json(silent=True) or {}
     with SessionLocal() as db:
-        bt = db.query(BadgeType).get(badge_type_id)
+        bt = db.get(BadgeType, badge_type_id)
         if not bt:
             return jsonify({"error": "not found"}), 404
 
@@ -99,7 +99,7 @@ def update_badge_type(badge_type_id: int):
 @admin_bp.delete("/badge-types/<int:badge_type_id>")
 def delete_badge_type(badge_type_id: int):
     with SessionLocal() as db:
-        bt = db.query(BadgeType).get(badge_type_id)
+        bt = db.get(BadgeType, badge_type_id)
         if not bt:
             return jsonify({"error": "not found"}), 404
         db.delete(bt)
@@ -147,7 +147,7 @@ def create_event():
 @admin_bp.get("/events/<int:event_id>")
 def get_event(event_id: int):
     with SessionLocal() as db:
-        ev = db.query(Event).get(event_id)
+        ev = db.get(Event, event_id)
         if not ev:
             return jsonify({"error": "not found"}), 404
         return jsonify(_event_to_dict(ev))
@@ -157,7 +157,7 @@ def get_event(event_id: int):
 def update_event(event_id: int):
     data = request.get_json(silent=True) or {}
     with SessionLocal() as db:
-        ev = db.query(Event).get(event_id)
+        ev = db.get(Event, event_id)
         if not ev:
             return jsonify({"error": "not found"}), 404
 
@@ -178,7 +178,7 @@ def update_event(event_id: int):
 @admin_bp.delete("/events/<int:event_id>")
 def delete_event(event_id: int):
     with SessionLocal() as db:
-        ev = db.query(Event).get(event_id)
+        ev = db.get(Event, event_id)
         if not ev:
             return jsonify({"error": "not found"}), 404
         db.delete(ev)
@@ -266,7 +266,7 @@ def update_assignment_status(assignment_id: int):
         return jsonify({"error": "status is required"}), 400
 
     with SessionLocal() as db:
-        a = db.query(Assignment).get(assignment_id)
+        a = db.get(Assignment, assignment_id)
         if not a:
             return jsonify({"error": "not found"}), 404
         try:

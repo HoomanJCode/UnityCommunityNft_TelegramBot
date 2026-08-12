@@ -41,7 +41,7 @@ class MintWorker:
     async def process_one(self, assignment_id: int) -> str:
         """Process a single assignment; returns its final status."""
         with SessionLocal() as db:
-            assignment = db.query(Assignment).get(assignment_id)
+            assignment = db.get(Assignment, assignment_id)
             if assignment is None:
                 return "not_found"
 
@@ -53,8 +53,8 @@ class MintWorker:
                 )
                 return assignment.status
 
-            user = db.query(User).get(assignment.user_id)
-            badge_type = db.query(BadgeType).get(assignment.badge_type_id)
+            user = db.get(User, assignment.user_id)
+            badge_type = db.get(BadgeType, assignment.badge_type_id)
 
             # Missing wallet → can't mint
             if user is None or not user.wallet_address:
@@ -78,7 +78,7 @@ class MintWorker:
             tx_hash = await self.ton_client.mint_nft(collection, wallet)
         except Exception as e:  # noqa: BLE001 - record any mint failure
             with SessionLocal() as db:
-                assignment = db.query(Assignment).get(assignment_id)
+                assignment = db.get(Assignment, assignment_id)
                 assignment.error = str(e)
                 transition_assignment(assignment, STATUS_FAILED)
                 db.commit()
@@ -86,7 +86,7 @@ class MintWorker:
             return STATUS_FAILED
 
         with SessionLocal() as db:
-            assignment = db.query(Assignment).get(assignment_id)
+            assignment = db.get(Assignment, assignment_id)
             assignment.tx_hash = tx_hash
             assignment.minted_at = datetime.now(timezone.utc)
             transition_assignment(assignment, STATUS_MINTED)

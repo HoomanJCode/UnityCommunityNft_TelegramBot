@@ -59,7 +59,7 @@ def test_process_one_mints_successfully(db):
 
     assert result == STATUS_MINTED
     assert client.calls == [("EQAbc...", "EQD...")]
-    a = db.query(Assignment).get(1)
+    a = db.get(Assignment, 1)
     assert a.status == STATUS_MINTED
     assert a.tx_hash == "tx-abc123"
     assert a.minted_at is not None
@@ -72,7 +72,7 @@ def test_process_one_needs_wallet(db):
     result = asyncio.run(worker.process_one(1))
 
     assert result == STATUS_NEEDS_WALLET
-    assert db.query(Assignment).get(1).status == STATUS_NEEDS_WALLET
+    assert db.get(Assignment, 1).status == STATUS_NEEDS_WALLET
 
 
 def test_process_one_fails_when_no_collection(db):
@@ -82,7 +82,7 @@ def test_process_one_fails_when_no_collection(db):
     result = asyncio.run(worker.process_one(1))
 
     assert result == STATUS_FAILED
-    a = db.query(Assignment).get(1)
+    a = db.get(Assignment, 1)
     assert a.status == STATUS_FAILED
     assert "collection" in a.error
 
@@ -94,7 +94,7 @@ def test_process_one_records_mint_error(db):
     result = asyncio.run(worker.process_one(1))
 
     assert result == STATUS_FAILED
-    a = db.query(Assignment).get(1)
+    a = db.get(Assignment, 1)
     assert a.status == STATUS_FAILED
     assert a.error == "mint boom"
 
@@ -106,4 +106,4 @@ def test_process_one_skips_non_queued(db):
     result = asyncio.run(worker.process_one(1))
 
     assert result == "pending"
-    assert db.query(Assignment).get(1).status == "pending"
+    assert db.get(Assignment, 1).status == "pending"
