@@ -23,10 +23,39 @@ VALID_STATUSES = {
     STATUS_NEEDS_WALLET,
 }
 
+# Allowed transitions (target -> allowed next states)
+TRANSITIONS = {
+    STATUS_PENDING: {STATUS_QUEUED, STATUS_FAILED},
+    STATUS_QUEUED: {STATUS_MINTING, STATUS_FAILED},
+    STATUS_MINTING: {STATUS_MINTED, STATUS_FAILED},
+    STATUS_FAILED: {STATUS_QUEUED, STATUS_PENDING},
+    STATUS_NEEDS_WALLET: {STATUS_PENDING},
+}
+
 
 def normalize_phone(phone: str) -> str:
     """Normalize a phone number to digits only."""
     return re.sub(r"\D", "", phone or "")
+
+
+def transition_assignment(
+    assignment: Assignment,
+    new_status: str,
+) -> None:
+    """Transition an assignment to a new status, validating the state machine.
+
+    Raises ValueError if the transition is not allowed.
+    """
+    if new_status not in VALID_STATUSES:
+        raise ValueError(f"unknown status: {new_status}")
+
+    allowed = TRANSITIONS.get(assignment.status)
+    if allowed and new_status not in allowed:
+        raise ValueError(
+            f"invalid transition: {assignment.status} -> {new_status}"
+        )
+
+    assignment.status = new_status
 
 
 def create_assignments_for_phones(

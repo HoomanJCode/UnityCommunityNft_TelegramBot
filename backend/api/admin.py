@@ -6,9 +6,12 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
-from backend.db.models import BadgeType, Event
+from backend.db.models import Assignment, BadgeType, Event
 from backend.db.session import SessionLocal
-from backend.services.assignment import create_assignments_for_phones
+from backend.services.assignment import (
+    create_assignments_for_phones,
+    transition_assignment,
+)
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -224,3 +227,52 @@ def upload_assignments_csv():
     with SessionLocal() as db:
         summary = create_assignments_for_phones(db, badge_type_id, phones)
     return jsonify(summary), 201
+
+
+def _assignment_to_dict(a: Assignment) -> dict:
+    return {
+        "id": a.id,
+        "badge_type_id": a.badge_type_id,
+        "user_id": a.user_id,
+        "status": a.status,
+        "tx_hash": a.tx_hash,
+        "error": a.error,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+        "minted_at": a.minted_at.isoformat() if a.minted_at else None,
+    }
+
+
+@admin_bp.get("/assignments")
+def list_assignments():
+    """List assignments, optionally filtered by ?status=<status>."""
+    status = request.args.get("status")
+    with SessionLocal() as db:
+        q = db.query(Assignment)
+        if status:
+            q = q.filter(Assignment.status == status)
+        items = q.order_by(Assignment.id).all()
+        return jsonify([_assignment_to_dict(a) for a in items])
+
+
+@admin_bp.post("/assignments/<int:assignment_id>/status")
+def update_assignment_status(assignment_id: int):
+    """Transition an assignment to a new status.
+
+    Body: {"status": "queued"}
+    """
+    data = request.get_json(silent=True) or {}
+    new_status = data.get("status")
+    if not new_status:
+        return jsonify({"error": "status is required"}), 400
+
+    with SessionLocal() as db:
+        a = db.query(Assignment).get(assignment_id)
+        if not a:
+            return jsonify({"error": "not found"}), 404
+        try:
+            transition_assignment(a, new_status)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 409
+        db.commit()
+        db.refresh(a)
+        return jsonify(_assignment_to_dict(a))
