@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_cors import CORS
 
+from backend.api.admin import admin_bp
 from backend.db.models import Base
 from backend.db.session import engine
 
@@ -20,6 +21,8 @@ CORS(
         os.getenv("ADMIN_WEB_URL", "http://localhost:5174"),
     ],
 )
+
+app.register_blueprint(admin_bp)
 
 
 @app.route("/health")
