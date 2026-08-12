@@ -1,11 +1,20 @@
 """Admin API — badge type & event management (Flask blueprint)."""
 
+from datetime import datetime
+
 from flask import Blueprint, jsonify, request
 
-from backend.db.models import BadgeType
+from backend.db.models import BadgeType, Event
 from backend.db.session import SessionLocal
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    """Parse an ISO-8601 datetime string, or return None."""
+    if not value:
+        return None
+    return datetime.fromisoformat(value)
 
 
 def _badge_type_to_dict(bt: BadgeType) -> dict:
@@ -90,3 +99,82 @@ def delete_badge_type(badge_type_id: int):
         db.delete(bt)
         db.commit()
         return jsonify({"deleted": badge_type_id})
+
+
+def _event_to_dict(ev: Event) -> dict:
+    return {
+        "id": ev.id,
+        "name": ev.name,
+        "description": ev.description,
+        "starts_at": ev.starts_at.isoformat() if ev.starts_at else None,
+        "badge_type_id": ev.badge_type_id,
+    }
+
+
+@admin_bp.get("/events")
+def list_events():
+    with SessionLocal() as db:
+        items = db.query(Event).order_by(Event.id).all()
+        return jsonify([_event_to_dict(e) for e in items])
+
+
+@admin_bp.post("/events")
+def create_event():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name is required"}), 400
+
+    ev = Event(
+        name=name,
+        description=data.get("description"),
+        starts_at=_parse_datetime(data.get("starts_at")),
+        badge_type_id=data.get("badge_type_id"),
+    )
+    with SessionLocal() as db:
+        db.add(ev)
+        db.commit()
+        db.refresh(ev)
+        return jsonify(_event_to_dict(ev)), 201
+
+
+@admin_bp.get("/events/<int:event_id>")
+def get_event(event_id: int):
+    with SessionLocal() as db:
+        ev = db.query(Event).get(event_id)
+        if not ev:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(_event_to_dict(ev))
+
+
+@admin_bp.put("/events/<int:event_id>")
+def update_event(event_id: int):
+    data = request.get_json(silent=True) or {}
+    with SessionLocal() as db:
+        ev = db.query(Event).get(event_id)
+        if not ev:
+            return jsonify({"error": "not found"}), 404
+
+        if "name" in data:
+            ev.name = data["name"]
+        if "description" in data:
+            ev.description = data["description"]
+        if "starts_at" in data:
+            ev.starts_at = _parse_datetime(data["starts_at"])
+        if "badge_type_id" in data:
+            ev.badge_type_id = data["badge_type_id"]
+
+        db.commit()
+        db.refresh(ev)
+        return jsonify(_event_to_dict(ev))
+
+
+@admin_bp.delete("/events/<int:event_id>")
+def delete_event(event_id: int):
+    with SessionLocal() as db:
+        ev = db.query(Event).get(event_id)
+        if not ev:
+            return jsonify({"error": "not found"}), 404
+        db.delete(ev)
+        db.commit()
+        return jsonify({"deleted": event_id})
